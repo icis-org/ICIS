@@ -107,6 +107,13 @@ Section
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "Icon" "$INSTDIR\${PRODUCT_EXECUTABLE},0"
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" --install "%1"'
 
+    ; icis:// protocol handler
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis" "" "URL:ICIS Protocol"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis" "URL Protocol" ""
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis" "EditFlags" "0"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis\DefaultIcon" "" "$INSTDIR\${PRODUCT_EXECUTABLE},0"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis\shell\open\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"'
+
     !insertmacro wails.writeUninstaller
 SectionEnd
 
@@ -115,6 +122,9 @@ Section "uninstall"
 
     ; Remove "Install with ICIS" context menu
     DeleteRegKey SHELL_CONTEXT "Software\Classes\.ici\shell\install"
+
+    ; Remove icis:// protocol handler
+    DeleteRegKey SHELL_CONTEXT "Software\Classes\icis"
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 

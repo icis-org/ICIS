@@ -28,6 +28,9 @@ type App struct {
 	autoInstall       bool
 	pendingLaunchPath string
 	pendingLaunchAuto bool
+	pendingProtocolURL string
+	wizardMode        bool
+	installing        bool
 	mu                sync.Mutex
 }
 
@@ -47,11 +50,17 @@ func (a *App) startup(ctx context.Context) {
 	a.uninst = uninstaller.New(database)
 	registry.CleanupLegacyCache()
 
-	filePath, autoInstall := parseArgs(os.Args[1:])
-	if filePath != "" {
+	filePath, autoInstall, protocolURL := parseArgs(os.Args[1:])
+	if protocolURL != "" {
+		a.mu.Lock()
+		a.pendingProtocolURL = protocolURL
+		a.wizardMode = true
+		a.mu.Unlock()
+	} else if filePath != "" {
 		a.mu.Lock()
 		a.pendingLaunchPath = filePath
 		a.pendingLaunchAuto = autoInstall
+		a.wizardMode = true
 		a.mu.Unlock()
 	}
 }
@@ -60,6 +69,56 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.database != nil {
 		a.database.Close()
 	}
+}
+
+func (a *App) shouldBlockClose() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.installing
+}
+
+func (a *App) focusWindow() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowUnminimise(a.ctx)
+	runtime.WindowShow(a.ctx)
+}
+
+func (a *App) EnterWizardMode() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.wizardMode = true
+}
+
+func (a *App) IsWizardMode() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.wizardMode
+}
+
+func (a *App) IsInstalling() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.installing
+}
+
+func (a *App) handleProtocolURL(iciURL string) {
+	a.mu.Lock()
+	a.pendingProtocolURL = iciURL
+	a.wizardMode = true
+	a.mu.Unlock()
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "protocol-ici", iciURL)
+	}
+}
+
+func (a *App) GetPendingProtocolURL() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	url := a.pendingProtocolURL
+	a.pendingProtocolURL = ""
+	return url
 }
 
 func (a *App) LoadICIFile(path string) (*iciparser.ICIFile, error) {
@@ -76,6 +135,7 @@ func (a *App) loadICIFile(path string, autoInstall bool) (*iciparser.ICIFile, er
 	a.pendingICI = ici
 	a.pendingPath = path
 	a.autoInstall = autoInstall
+	a.wizardMode = true
 	a.mu.Unlock()
 
 	runtime.EventsEmit(a.ctx, "ici-loaded", ici)
@@ -131,6 +191,20 @@ func (a *App) GetPendingFile() PendingFile {
 }
 
 func (a *App) InstallApp(iciContent string, installDir string) error {
+	a.mu.Lock()
+	if a.installing {
+		a.mu.Unlock()
+		return fmt.Errorf("an installation is already in progress")
+	}
+	a.installing = true
+	a.mu.Unlock()
+
+	defer func() {
+		a.mu.Lock()
+		a.installing = false
+		a.mu.Unlock()
+	}()
+
 	ici, err := iciparser.ParseString(iciContent)
 	if err != nil {
 		return fmt.Errorf("failed to parse .ici: %w", err)

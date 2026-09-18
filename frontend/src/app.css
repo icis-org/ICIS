@@ -525,3 +525,77 @@
     font-weight: 400;
     margin-bottom: 0;
 }
+
+/* Wizard mode */
+.wizard-root {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.wizard-header {
+    padding: 16px 24px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.wizard-header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.wizard-body {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+}
+
+.wizard-page {
+    display: none;
+    padding: 32px;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.wizard-page.active {
+    display: flex;
+}
+
+.wizard-card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 32px;
+}
+
+.wizard-card h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.wizard-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.wizard-done-icon {
+    color: var(--success);
+    margin-bottom: 16px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}

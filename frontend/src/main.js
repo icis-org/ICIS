@@ -10,26 +10,54 @@ import {
     SelectDirectory,
     IsAutoInstall,
     GetPendingFile,
+    IsWizardMode,
+    EnterWizardMode,
+    IsInstalling,
+    GetPendingProtocolURL,
     GetRegistryApps,
     LoadRegistryICI,
     GetRegistryURL,
     SetRegistryURL,
 } from '../wailsjs/go/main/App.js';
-import { EventsOn } from '../wailsjs/runtime/runtime.js';
+import { EventsOn, Quit } from '../wailsjs/runtime/runtime.js';
 
 let currentScreen = 'home';
 let currentICI = null;
+let pendingSource = '';
 let selectedDir = 'appdata';
+let wizardMode = false;
+let wizardStep = 'confirm';
+let storeData = [];
+let eventsBound = false;
 
 function init() {
-    document.querySelector('#app').innerHTML = layout();
-    setupNav();
-    setupHome();
-    setupInstall();
-    setupCreate();
-    setupInstalled();
-    setupStore();
-    listenEvents();
+    detectWizardMode();
+}
+
+async function detectWizardMode() {
+    try {
+        wizardMode = await IsWizardMode();
+    } catch (e) {
+        wizardMode = false;
+    }
+
+    if (wizardMode) {
+        document.querySelector('#app').innerHTML = wizardLayout();
+        setupWizard();
+        listenEvents();
+        checkPendingProtocol();
+        checkPendingFile();
+    } else {
+        document.querySelector('#app').innerHTML = layout();
+        setupNav();
+        setupHome();
+        setupInstall();
+        setupCreate();
+        setupInstalled();
+        setupStore();
+        listenEvents();
+        checkPendingFile();
+    }
 }
 
 function layout() {
@@ -66,6 +94,252 @@ function layout() {
         ${screenInstalled()}
         ${screenStore()}
     </div>`;
+}
+
+function wizardLayout() {
+    return `
+    <div class="wizard-root">
+        <div class="wizard-header">
+            <h1>ICIS Installer</h1>
+        </div>
+        <div class="wizard-body" id="wizard-body">
+            ${wizardPageConfirm()}
+            ${wizardPageProgress()}
+            ${wizardPageDone()}
+        </div>
+    </div>`;
+}
+
+function wizardPageConfirm() {
+    return `
+    <div id="wizard-confirm" class="wizard-page active">
+        <div class="wizard-card">
+            <h2 id="wiz-name"></h2>
+            <div class="version" id="wiz-version"></div>
+            <div class="desc" id="wiz-desc"></div>
+            <div class="detail-row">
+                <span class="detail-label">Source</span>
+                <span class="detail-value" id="wiz-source" style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Download</span>
+                <span class="detail-value" id="wiz-url" style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Type</span>
+                <span class="detail-value" id="wiz-type"></span>
+            </div>
+            <div id="wiz-shortcuts-section" style="display:none;margin-top:12px">
+                <label style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Shortcuts</label>
+                <div id="wiz-shortcuts-list" style="margin-top:6px;font-size:13px;color:var(--text-primary)"></div>
+            </div>
+            <div style="margin-top:15px">
+                <label style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Install Location</label>
+                <div class="install-dir-select" id="wiz-dir-select">
+                    <div class="dir-option selected" data-dir="appdata">AppData</div>
+                    <div class="dir-option" data-dir="programfiles">Program Files</div>
+                    <div class="dir-option" data-dir="custom">Custom...</div>
+                </div>
+                <div class="custom-dir-row" id="wiz-custom-dir-row" style="display:none">
+                    <input class="custom-dir-input" id="wiz-custom-dir-input" placeholder="Select custom directory..."/>
+                    <button class="btn btn-secondary" id="wiz-browse-dir" style="font-size:12px">Browse</button>
+                </div>
+            </div>
+            <div class="wizard-actions">
+                <button class="btn btn-secondary" id="wiz-cancel">Cancel</button>
+                <button class="btn btn-primary" id="wiz-install">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Install
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function wizardPageProgress() {
+    return `
+    <div id="wizard-progress" class="wizard-page">
+        <div class="wizard-card">
+            <h2>Installing <span id="wiz-prog-name"></span></h2>
+            <div class="progress-container" style="display:block">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="wiz-progress-bar"></div>
+                </div>
+                <div class="progress-status">
+                    <span id="wiz-progress-text">Preparing...</span>
+                    <span id="wiz-progress-percent">0%</span>
+                </div>
+            </div>
+            <div id="wiz-progress-warnings" style="margin-top:12px"></div>
+        </div>
+    </div>`;
+}
+
+function wizardPageDone() {
+    return `
+    <div id="wizard-done" class="wizard-page">
+        <div class="wizard-card" style="text-align:center">
+            <div class="wizard-done-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h2 id="wiz-done-name"></h2>
+            <p id="wiz-done-path" style="color:var(--text-secondary);font-size:13px;word-break:break-all"></p>
+            <div class="wizard-actions" style="justify-content:center;margin-top:20px">
+                <button class="btn btn-primary" id="wiz-done-finish">Finish</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function wizardShowStep(step) {
+    wizardStep = step;
+    document.querySelectorAll('.wizard-page').forEach(p => p.classList.remove('active'));
+    const page = document.getElementById('wizard-' + step);
+    if (page) page.classList.add('active');
+}
+
+function setupWizard() {
+    document.querySelectorAll('#wiz-dir-select .dir-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            document.querySelectorAll('#wiz-dir-select .dir-option').forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            selectedDir = opt.dataset.dir;
+            document.getElementById('wiz-custom-dir-row').style.display = selectedDir === 'custom' ? 'flex' : 'none';
+        });
+    });
+
+    const browseBtn = document.getElementById('wiz-browse-dir');
+    if (browseBtn) {
+        browseBtn.addEventListener('click', async () => {
+            try {
+                const dir = await SelectDirectory();
+                if (dir) {
+                    document.getElementById('wiz-custom-dir-input').value = dir;
+                }
+            } catch (e) {}
+        });
+    }
+
+    document.getElementById('wiz-install').addEventListener('click', doWizardInstall);
+
+    document.getElementById('wiz-cancel').addEventListener('click', async () => {
+        if (wizardMode) {
+            try { Quit(); } catch (e) { window.close(); }
+        } else {
+            switchScreen('home');
+        }
+    });
+
+    document.getElementById('wiz-done-finish').addEventListener('click', async () => {
+        if (wizardMode) {
+            try { Quit(); } catch (e) { window.close(); }
+        } else {
+            switchScreen('home');
+        }
+    });
+}
+
+function showWizardConfirm(ici, source) {
+    currentICI = ici;
+    document.getElementById('wiz-name').textContent = ici.name;
+    document.getElementById('wiz-version').textContent = ici.version || '';
+    document.getElementById('wiz-desc').textContent = ici.desc || '';
+    document.getElementById('wiz-source').textContent = source || '';
+    document.getElementById('wiz-url').textContent = ici.url;
+    document.getElementById('wiz-type').textContent = (ici.type || 'zip').toUpperCase();
+
+    const sc = document.getElementById('wiz-shortcuts-section');
+    const sl = document.getElementById('wiz-shortcuts-list');
+    if (ici.shortcuts && ici.shortcuts.length > 0) {
+        sc.style.display = 'block';
+        sl.innerHTML = ici.shortcuts.map(s => `<div style="padding:4px 0">  ${s.name || s.Name || s}</div>`).join('');
+    } else if (ici.shortcut) {
+        sc.style.display = 'block';
+        sl.innerHTML = `<div style="padding:4px 0">  ${ici.shortcut}</div>`;
+    } else {
+        sc.style.display = 'none';
+    }
+
+    selectedDir = 'appdata';
+    document.querySelectorAll('#wiz-dir-select .dir-option').forEach(o => o.classList.remove('selected'));
+    document.querySelector('#wiz-dir-select .dir-option[data-dir="appdata"]').classList.add('selected');
+    document.getElementById('wiz-custom-dir-row').style.display = 'none';
+
+    document.getElementById('wiz-progress-bar').style.width = '0%';
+    document.getElementById('wiz-progress-bar').classList.remove('success');
+    document.getElementById('wiz-progress-warnings').innerHTML = '';
+
+    document.getElementById('wiz-prog-name').textContent = ici.name;
+    wizardShowStep('confirm');
+}
+
+async function doWizardInstall() {
+    if (!currentICI) return;
+
+    let installDir = '';
+    if (selectedDir === 'custom') {
+        installDir = document.getElementById('wiz-custom-dir-input').value;
+        if (!installDir) {
+            showToast('Please select a custom directory', 'error');
+            return;
+        }
+    }
+
+    document.getElementById('wiz-progress-bar').style.width = '0%';
+    document.getElementById('wiz-progress-text').textContent = 'Preparing installation...';
+    document.getElementById('wiz-progress-percent').textContent = '0%';
+    document.getElementById('wiz-progress-warnings').innerHTML = '';
+
+    wizardShowStep('progress');
+
+    const iciContent = buildICIContent(currentICI);
+
+    try {
+        await InstallApp(iciContent, installDir);
+    } catch (err) {
+        showToast(err, 'error');
+        wizardShowStep('confirm');
+    }
+}
+
+async function checkPendingProtocol() {
+    try {
+        const protocolURL = await GetPendingProtocolURL();
+        if (protocolURL) {
+            showToast('Loading package from: ' + protocolURL, 'warning');
+            const ici = await LoadRegistryICI(protocolURL);
+            if (ici) {
+                showWizardConfirm(ici, protocolURL);
+            } else {
+                showToast('Failed to load package: no data returned', 'error');
+            }
+        }
+    } catch (e) {
+        showToast('Failed to load package: ' + (e.message || e), 'error');
+    }
+}
+
+function setupNav() {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const screen = item.dataset.screen;
+            switchScreen(screen);
+        });
+    });
+}
+
+function switchScreen(name) {
+    currentScreen = name;
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const navItem = document.querySelector(`.nav-item[data-screen="${name}"]`);
+    if (navItem) navItem.classList.add('active');
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const screen = document.getElementById(`screen-${name}`);
+    if (screen) screen.classList.add('active');
+
+    if (name === 'installed') {
+        refreshInstalled();
+    }
 }
 
 function screenHome() {
@@ -257,35 +531,12 @@ function screenStore() {
     </div>`;
 }
 
-function setupNav() {
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const screen = item.dataset.screen;
-            switchScreen(screen);
-        });
-    });
-}
-
-function switchScreen(name) {
-    currentScreen = name;
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    const navItem = document.querySelector(`.nav-item[data-screen="${name}"]`);
-    if (navItem) navItem.classList.add('active');
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    const screen = document.getElementById(`screen-${name}`);
-    if (screen) screen.classList.add('active');
-
-    if (name === 'installed') {
-        refreshInstalled();
-    }
-}
-
 function setupHome() {
     document.getElementById('btn-open-ici').addEventListener('click', async () => {
         try {
             const filePath = await OpenFile();
             if (filePath) {
-                const { LoadICIFile } = await import('../wailsjs/go/main/App.js');
+                pendingSource = filePath;
                 const ici = await LoadICIFile(filePath);
                 if (ici) {
                     showInstallScreen(ici);
@@ -338,8 +589,8 @@ function setupInstall() {
             if (dir) {
                 document.getElementById('custom-dir-input').value = dir;
             }
-        } catch (err) {
-            console.error(err);
+        } catch (e) {
+            console.error(e);
         }
     });
 
@@ -416,8 +667,6 @@ function updateCreatePreview() {
 function setupInstalled() {
     document.getElementById('btn-refresh-installed').addEventListener('click', refreshInstalled);
 }
-
-let storeData = [];
 
 function setupStore() {
     document.getElementById('btn-store-refresh').addEventListener('click', () => loadStore());
@@ -504,7 +753,16 @@ window.storeInstall = async function(iciURL) {
     try {
         const ici = await LoadRegistryICI(iciURL);
         if (ici) {
-            showInstallScreen(ici);
+            pendingSource = iciURL;
+            if (wizardMode) {
+                showWizardConfirm(ici, iciURL);
+            } else {
+                await EnterWizardMode();
+                wizardMode = true;
+                document.querySelector('#app').innerHTML = wizardLayout();
+                setupWizard();
+                showWizardConfirm(ici, iciURL);
+            }
         }
     } catch (e) {
         showToast('Failed to load package: ' + e, 'error');
@@ -584,7 +842,8 @@ function buildICIContent(ici) {
     if (ici.type) lines.push(`type: ${ici.type}`);
     lines.push(`install_dir: ${selectedDir || 'appdata'}`);
     if (selectedDir === 'custom') {
-        lines.push(`custom_dir: ${document.getElementById('custom-dir-input')?.value || ''}`);
+        const customInput = document.getElementById('custom-dir-input') || document.getElementById('wiz-custom-dir-input');
+        lines.push(`custom_dir: ${customInput?.value || ''}`);
     }
     if (ici.shortcuts && ici.shortcuts.length > 0) {
         const entries = ici.shortcuts.map(s => {
@@ -646,23 +905,52 @@ window.uninstallApp = async function(name) {
 };
 
 function listenEvents() {
+    if (eventsBound) return;
+    eventsBound = true;
+
     EventsOn('ici-loaded', async (ici) => {
-        showInstallScreen(ici);
+        if (wizardMode) {
+            showWizardConfirm(ici, pendingSource);
+        } else {
+            showInstallScreen(ici);
+        }
         try {
             const auto = await IsAutoInstall();
             if (auto) {
-                setTimeout(() => doInstall(), 500);
+                setTimeout(() => {
+                    if (wizardMode) doWizardInstall();
+                    else doInstall();
+                }, 500);
+            }
+        } catch (e) {}
+    });
+
+    EventsOn('protocol-ici', async (iciURL) => {
+        try {
+            const ici = await LoadRegistryICI(iciURL);
+            if (ici) {
+                if (wizardMode) {
+                    showWizardConfirm(ici, iciURL);
+                } else {
+                    wizardMode = true;
+                    document.querySelector('#app').innerHTML = wizardLayout();
+                    setupWizard();
+                    showWizardConfirm(ici, iciURL);
+                }
             }
         } catch (e) {
-            console.error('autoInstall check failed:', e);
+            showToast('Failed to load package: ' + e, 'error');
         }
     });
 
     EventsOn('download-progress', (data) => {
         const percent = Math.round(data.percent || 0);
-        document.getElementById('progress-bar').style.width = percent + '%';
-        document.getElementById('progress-text').textContent = `Downloading... ${formatBytes(data.downloaded)} / ${formatBytes(data.total)}`;
-        document.getElementById('progress-percent').textContent = percent + '%';
+        const bar = document.getElementById('wiz-progress-bar') || document.getElementById('progress-bar');
+        const text = document.getElementById('wiz-progress-text') || document.getElementById('progress-text');
+        const pct = document.getElementById('wiz-progress-percent') || document.getElementById('progress-percent');
+        if (bar) bar.style.width = percent + '%';
+        if (text) text.textContent = `Downloading... ${formatBytes(data.downloaded)} / ${formatBytes(data.total)}`;
+        if (pct) pct.textContent = percent + '%';
     });
 
     EventsOn('install-progress', (data) => {
@@ -673,34 +961,46 @@ function listenEvents() {
             saving: 'Saving installation record...',
         };
         const msg = data.message || statusMessages[data.status] || data.status;
-        document.getElementById('progress-text').textContent = msg;
+        const text = document.getElementById('wiz-progress-text') || document.getElementById('progress-text');
+        if (text) text.textContent = msg;
         if (data.status === 'shortcut-warning') {
             showToast(msg, 'warning');
+            if (wizardMode) {
+                const warnDiv = document.getElementById('wiz-progress-warnings');
+                if (warnDiv) warnDiv.innerHTML += `<div style="color:var(--warning);font-size:12px;margin-top:4px">  ${msg}</div>`;
+            }
         }
     });
 
     EventsOn('extract-progress', (data) => {
-        document.getElementById('progress-text').textContent = `Extracting: ${data.file} (${data.current}/${data.total})`;
+        const text = document.getElementById('wiz-progress-text') || document.getElementById('progress-text');
+        if (text) text.textContent = `Extracting: ${data.file} (${data.current}/${data.total})`;
     });
 
     EventsOn('install-complete', (data) => {
-        const bar = document.getElementById('progress-bar');
-        bar.style.width = '100%';
-        bar.classList.add('success');
-        document.getElementById('progress-text').textContent = data.message;
-        document.getElementById('progress-percent').textContent = '100%';
+        if (wizardMode) {
+            document.getElementById('wiz-done-name').textContent = data.name;
+            document.getElementById('wiz-done-path').textContent = data.path;
+            wizardShowStep('done');
+        } else {
+            const bar = document.getElementById('progress-bar');
+            bar.style.width = '100%';
+            bar.classList.add('success');
+            document.getElementById('progress-text').textContent = data.message;
+            document.getElementById('progress-percent').textContent = '100%';
 
-        const btn = document.getElementById('btn-do-install');
-        btn.disabled = false;
-        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Install`;
+            const btn = document.getElementById('btn-do-install');
+            btn.disabled = false;
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Install`;
 
-        showToast(data.message, 'success');
+            showToast(data.message, 'success');
 
-        setTimeout(() => {
-            document.getElementById('progress-section').style.display = 'none';
-            bar.style.width = '0%';
-            bar.classList.remove('success');
-        }, 3000);
+            setTimeout(() => {
+                document.getElementById('progress-section').style.display = 'none';
+                bar.style.width = '0%';
+                bar.classList.remove('success');
+            }, 3000);
+        }
     });
 
     EventsOn('uninstall-complete', (data) => {
@@ -730,18 +1030,17 @@ function showToast(message, type) {
     }, 4000);
 }
 
-init();
-checkPendingFile();
-
 async function checkPendingFile() {
     try {
         const pending = await GetPendingFile();
         if (pending && pending.path) {
             const ici = await LoadICIFile(pending.path);
             if (ici) {
-                showInstallScreen(ici);
                 if (pending.auto) {
-                    setTimeout(() => doInstall(), 500);
+                    setTimeout(() => {
+                        if (wizardMode) doWizardInstall();
+                        else doInstall();
+                    }, 500);
                 }
             } else {
                 showToast('Failed to load .ici file: no data returned', 'error');
@@ -751,3 +1050,5 @@ async function checkPendingFile() {
         showToast('Failed to load .ici file: ' + (e.message || e), 'error');
     }
 }
+
+init();

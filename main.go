@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"net/url"
 	"strings"
 
 	"github.com/wailsapp/wails/v2"
@@ -29,7 +30,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 18, G: 18, B: 24, A: 1},
 		OnStartup:        app.startup,
 		OnBeforeClose: func(ctx context.Context) bool {
-			return false
+			return app.shouldBlockClose()
 		},
 		Bind: []interface{}{
 			app,
@@ -42,11 +43,14 @@ func main() {
 			UniqueId: "e3984e08-28dc-4e3d-b70a-45e961589cdc",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				if len(secondInstanceData.Args) > 0 {
-					filePath, autoInstall := parseArgs(secondInstanceData.Args)
-					if filePath != "" {
+					filePath, autoInstall, protocolURL := parseArgs(secondInstanceData.Args)
+					if protocolURL != "" {
+						app.handleProtocolURL(protocolURL)
+					} else if filePath != "" {
 						app.loadICIFileWithAutoInstall(filePath, autoInstall)
 					}
 				}
+				app.focusWindow()
 			},
 		},
 	})
@@ -56,21 +60,41 @@ func main() {
 	}
 }
 
-func parseArgs(args []string) (filePath string, autoInstall bool) {
+func parseArgs(args []string) (filePath string, autoInstall bool, protocolURL string) {
+	for _, arg := range args {
+		if strings.HasPrefix(strings.ToLower(arg), "icis://") {
+			parsed, err := url.Parse(arg)
+			if err != nil {
+				continue
+			}
+			if strings.ToLower(parsed.Host) != "install" {
+				continue
+			}
+			iciURL := parsed.Query().Get("ici")
+			if iciURL == "" {
+				continue
+			}
+			if !strings.HasPrefix(strings.ToLower(iciURL), "https://") {
+				continue
+			}
+			return "", false, iciURL
+		}
+	}
+
 	for i, arg := range args {
 		if arg == "--install" && i+1 < len(args) {
 			next := args[i+1]
 			if strings.HasSuffix(strings.ToLower(next), ".ici") {
-				return next, true
+				return next, true, ""
 			}
 		}
 	}
 
 	for _, arg := range args {
 		if strings.HasSuffix(strings.ToLower(arg), ".ici") {
-			return arg, false
+			return arg, false, ""
 		}
 	}
 
-	return "", false
+	return "", false, ""
 }
