@@ -6,6 +6,7 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "nsisType": "single",
   "author": {
     "name": "Isam",
     "email": ""
@@ -19,7 +20,7 @@
     "fileAssociations": [
       {
         "ext": "ici",
-        "name": "ICIS Application",
+        "name": "ICIS.File",
         "description": "ICIS Configuration File",
         "iconName": "appicon"
       }

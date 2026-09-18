@@ -2,11 +2,14 @@ import './style.css';
 import './app.css';
 import {
     LoadICIContent,
+    LoadICIFile,
     InstallApp,
     UninstallApp,
     ListInstalledApps,
     OpenFile,
     SelectDirectory,
+    IsAutoInstall,
+    GetPendingFile,
 } from '../wailsjs/go/main/App.js';
 import { EventsOn } from '../wailsjs/runtime/runtime.js';
 
@@ -478,8 +481,16 @@ window.uninstallApp = async function(name) {
 };
 
 function listenEvents() {
-    EventsOn('ici-loaded', (ici) => {
+    EventsOn('ici-loaded', async (ici) => {
         showInstallScreen(ici);
+        try {
+            const auto = await IsAutoInstall();
+            if (auto) {
+                setTimeout(() => doInstall(), 500);
+            }
+        } catch (e) {
+            console.error('autoInstall check failed:', e);
+        }
     });
 
     EventsOn('download-progress', (data) => {
@@ -551,3 +562,23 @@ function showToast(message, type) {
 }
 
 init();
+checkPendingFile();
+
+async function checkPendingFile() {
+    try {
+        const pending = await GetPendingFile();
+        if (pending && pending.path) {
+            const ici = await LoadICIFile(pending.path);
+            if (ici) {
+                showInstallScreen(ici);
+                if (pending.auto) {
+                    setTimeout(() => doInstall(), 500);
+                }
+            } else {
+                showToast('Failed to load .ici file: no data returned', 'error');
+            }
+        }
+    } catch (e) {
+        showToast('Failed to load .ici file: ' + (e.message || e), 'error');
+    }
+}

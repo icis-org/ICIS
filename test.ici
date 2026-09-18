@@ -1,0 +1,7 @@
+name: TestApp
+version: 1.0
+desc: Test application
+url: https://example.com/test.zip
+type: zip
+install_dir: appdata
+shortcut: TestApp

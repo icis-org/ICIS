@@ -19,12 +19,15 @@ import (
 )
 
 type App struct {
-	ctx          context.Context
-	database     *db.DB
-	uninst       *uninstaller.Uninstaller
-	pendingICI   *iciparser.ICIFile
-	pendingPath  string
-	mu           sync.Mutex
+	ctx               context.Context
+	database          *db.DB
+	uninst            *uninstaller.Uninstaller
+	pendingICI        *iciparser.ICIFile
+	pendingPath       string
+	autoInstall       bool
+	pendingLaunchPath string
+	pendingLaunchAuto bool
+	mu                sync.Mutex
 }
 
 func NewApp() *App {
@@ -42,14 +45,12 @@ func (a *App) startup(ctx context.Context) {
 	a.database = database
 	a.uninst = uninstaller.New(database)
 
-	args := os.Args[1:]
-	if len(args) > 0 {
-		filePath := args[0]
-		if strings.HasSuffix(strings.ToLower(filePath), ".ici") {
-			go func() {
-				a.loadICIFile(filePath)
-			}()
-		}
+	filePath, autoInstall := parseArgs(os.Args[1:])
+	if filePath != "" {
+		a.mu.Lock()
+		a.pendingLaunchPath = filePath
+		a.pendingLaunchAuto = autoInstall
+		a.mu.Unlock()
 	}
 }
 
@@ -60,10 +61,10 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 func (a *App) LoadICIFile(path string) (*iciparser.ICIFile, error) {
-	return a.loadICIFile(path)
+	return a.loadICIFile(path, false)
 }
 
-func (a *App) loadICIFile(path string) (*iciparser.ICIFile, error) {
+func (a *App) loadICIFile(path string, autoInstall bool) (*iciparser.ICIFile, error) {
 	ici, err := iciparser.Parse(path)
 	if err != nil {
 		return nil, err
@@ -72,11 +73,16 @@ func (a *App) loadICIFile(path string) (*iciparser.ICIFile, error) {
 	a.mu.Lock()
 	a.pendingICI = ici
 	a.pendingPath = path
+	a.autoInstall = autoInstall
 	a.mu.Unlock()
 
 	runtime.EventsEmit(a.ctx, "ici-loaded", ici)
 
 	return ici, nil
+}
+
+func (a *App) loadICIFileWithAutoInstall(path string, autoInstall bool) (*iciparser.ICIFile, error) {
+	return a.loadICIFile(path, autoInstall)
 }
 
 func (a *App) LoadICIContent(content string) (*iciparser.ICIFile, error) {
@@ -88,6 +94,7 @@ func (a *App) LoadICIContent(content string) (*iciparser.ICIFile, error) {
 	a.mu.Lock()
 	a.pendingICI = ici
 	a.pendingPath = ""
+	a.autoInstall = false
 	a.mu.Unlock()
 
 	runtime.EventsEmit(a.ctx, "ici-loaded", ici)
@@ -99,6 +106,26 @@ func (a *App) GetPendingICI() *iciparser.ICIFile {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.pendingICI
+}
+
+func (a *App) IsAutoInstall() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.autoInstall
+}
+
+type PendingFile struct {
+	Path string `json:"path"`
+	Auto bool   `json:"auto"`
+}
+
+func (a *App) GetPendingFile() PendingFile {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	pf := PendingFile{Path: a.pendingLaunchPath, Auto: a.pendingLaunchAuto}
+	a.pendingLaunchPath = ""
+	a.pendingLaunchAuto = false
+	return pf
 }
 
 func (a *App) InstallApp(iciContent string, installDir string) error {

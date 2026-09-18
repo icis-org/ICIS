@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -41,10 +42,9 @@ func main() {
 			UniqueId: "e3984e08-28dc-4e3d-b70a-45e961589cdc",
 			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
 				if len(secondInstanceData.Args) > 0 {
-					for _, arg := range secondInstanceData.Args {
-						if len(arg) > 4 && arg[len(arg)-4:] == ".ici" {
-							app.loadICIFile(arg)
-						}
+					filePath, autoInstall := parseArgs(secondInstanceData.Args)
+					if filePath != "" {
+						app.loadICIFileWithAutoInstall(filePath, autoInstall)
 					}
 				}
 			},
@@ -54,4 +54,23 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+func parseArgs(args []string) (filePath string, autoInstall bool) {
+	for i, arg := range args {
+		if arg == "--install" && i+1 < len(args) {
+			next := args[i+1]
+			if strings.HasSuffix(strings.ToLower(next), ".ici") {
+				return next, true
+			}
+		}
+	}
+
+	for _, arg := range args {
+		if strings.HasSuffix(strings.ToLower(arg), ".ici") {
+			return arg, false
+		}
+	}
+
+	return "", false
 }

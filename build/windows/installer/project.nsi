@@ -102,11 +102,19 @@ Section
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
 
+    ; "Install with ICIS" context menu for .ici files
+    WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "" "Install with ICIS"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "Icon" "$INSTDIR\${PRODUCT_EXECUTABLE},0"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" --install "%1"'
+
     !insertmacro wails.writeUninstaller
 SectionEnd
 
 Section "uninstall"
     !insertmacro wails.setShellContext
+
+    ; Remove "Install with ICIS" context menu
+    DeleteRegKey SHELL_CONTEXT "Software\Classes\.ici\shell\install"
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 

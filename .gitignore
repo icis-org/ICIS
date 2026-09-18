@@ -5,6 +5,7 @@ build/bin/
 *.dll
 *.so
 *.dylib
+*-installer.exe
 
 # Go
 /vendor/
