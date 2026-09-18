@@ -12,6 +12,7 @@ import (
 	"icis/internal/iciparser"
 	"icis/internal/downloader"
 	"icis/internal/extractor"
+	"icis/internal/registry"
 	"icis/internal/shortcut"
 	"icis/internal/uninstaller"
 
@@ -361,4 +362,43 @@ func (a *App) SelectDirectory() (string, error) {
 		return "", err
 	}
 	return dir, nil
+}
+
+func (a *App) GetRegistryApps(forceRefresh bool) registry.RegistryResult {
+	cfg := registry.LoadConfig()
+	url := cfg.RegistryURL
+	if forceRefresh {
+		return registry.FetchIndex(url)
+	}
+	result := registry.FetchIndex(url)
+	return result
+}
+
+func (a *App) LoadRegistryICI(iciURL string) (*iciparser.ICIFile, error) {
+	content, err := registry.FetchICI(iciURL)
+	if err != nil {
+		return nil, err
+	}
+	ici, err := iciparser.ParseString(content)
+	if err != nil {
+		return nil, err
+	}
+	a.mu.Lock()
+	a.pendingICI = ici
+	a.pendingPath = ""
+	a.autoInstall = false
+	a.mu.Unlock()
+	runtime.EventsEmit(a.ctx, "ici-loaded", ici)
+	return ici, nil
+}
+
+func (a *App) GetRegistryURL() string {
+	cfg := registry.LoadConfig()
+	return cfg.RegistryURL
+}
+
+func (a *App) SetRegistryURL(url string) error {
+	cfg := registry.LoadConfig()
+	cfg.RegistryURL = url
+	return registry.SaveConfig(cfg)
 }

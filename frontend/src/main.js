@@ -10,6 +10,10 @@ import {
     SelectDirectory,
     IsAutoInstall,
     GetPendingFile,
+    GetRegistryApps,
+    LoadRegistryICI,
+    GetRegistryURL,
+    SetRegistryURL,
 } from '../wailsjs/go/main/App.js';
 import { EventsOn } from '../wailsjs/runtime/runtime.js';
 
@@ -24,6 +28,7 @@ function init() {
     setupInstall();
     setupCreate();
     setupInstalled();
+    setupStore();
     listenEvents();
 }
 
@@ -46,6 +51,10 @@ function layout() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             Installed
         </div>
+        <div class="nav-item" data-screen="store">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            Store
+        </div>
         <div class="sidebar-footer">
             <div class="version">ICIS v1.0.0</div>
         </div>
@@ -55,6 +64,7 @@ function layout() {
         ${screenCreate()}
         ${screenInstall()}
         ${screenInstalled()}
+        ${screenStore()}
     </div>`;
 }
 
@@ -218,6 +228,35 @@ function screenInstalled() {
     </div>`;
 }
 
+function screenStore() {
+    return `
+    <div id="screen-store" class="screen">
+        <div class="page-header">
+            <h2>Store</h2>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary" id="btn-store-settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Settings
+                </button>
+                <button class="btn btn-secondary" id="btn-store-refresh">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div id="store-status" style="margin-bottom:12px;font-size:12px;color:var(--text-secondary)"></div>
+        <input type="text" id="store-search" placeholder="Search packages..." style="width:100%;padding:10px 14px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;outline:none;margin-bottom:16px;box-sizing:border-box"/>
+        <div id="store-list" class="installed-list"></div>
+        <div id="store-settings-panel" style="display:none;margin-top:16px;padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md)">
+            <label style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Registry URL</label>
+            <div style="display:flex;gap:8px;margin-top:8px">
+                <input type="text" id="store-url-input" style="flex:1;padding:10px 14px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:13px;outline:none"/>
+                <button class="btn btn-primary" id="btn-store-url-save">Save</button>
+            </div>
+        </div>
+    </div>`;
+}
+
 function setupNav() {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => {
@@ -378,6 +417,100 @@ function setupInstalled() {
     document.getElementById('btn-refresh-installed').addEventListener('click', refreshInstalled);
 }
 
+let storeData = [];
+
+function setupStore() {
+    document.getElementById('btn-store-refresh').addEventListener('click', () => loadStore(true));
+    document.getElementById('btn-store-settings').addEventListener('click', () => {
+        const panel = document.getElementById('store-settings-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    document.getElementById('btn-store-url-save').addEventListener('click', async () => {
+        const url = document.getElementById('store-url-input').value.trim();
+        if (!url) return;
+        try {
+            await SetRegistryURL(url);
+            showToast('Registry URL saved', 'success');
+            document.getElementById('store-settings-panel').style.display = 'none';
+            loadStore(true);
+        } catch (e) {
+            showToast('Failed to save URL: ' + e, 'error');
+        }
+    });
+    document.getElementById('store-search').addEventListener('input', filterStore);
+
+    loadStore(false);
+}
+
+async function loadStore(forceRefresh) {
+    const list = document.getElementById('store-list');
+    const status = document.getElementById('store-status');
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary)">Loading...</div>';
+
+    try {
+        const result = await GetRegistryApps(forceRefresh);
+        storeData = result.index?.packages || [];
+        status.textContent = result.offline
+            ? 'Offline — showing cached data' + (result.error ? ' (' + result.error + ')' : '')
+            : '';
+        renderStore(storeData);
+    } catch (e) {
+        list.innerHTML = '<div class="empty-state"><h3>Failed to load store</h3><p>' + (e.message || e) + '</p></div>';
+    }
+
+    try {
+        const url = await GetRegistryURL();
+        document.getElementById('store-url-input').value = url;
+    } catch (e) {}
+}
+
+function filterStore() {
+    const query = document.getElementById('store-search').value.toLowerCase();
+    const filtered = storeData.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        (p.desc && p.desc.toLowerCase().includes(query))
+    );
+    renderStore(filtered);
+}
+
+function renderStore(packages) {
+    const list = document.getElementById('store-list');
+    if (!packages || packages.length === 0) {
+        list.innerHTML = `
+        <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            <h3>No packages found</h3>
+            <p>Check your registry URL or try a different search.</p>
+        </div>`;
+        return;
+    }
+    list.innerHTML = packages.map(pkg => `
+        <div class="installed-item">
+            <div class="app-info">
+                <span class="name">${pkg.name}${pkg.version ? ' v' + pkg.version : ''}</span>
+                <span class="meta">${pkg.desc || ''}${pkg.homepage ? ' · ' + pkg.homepage : ''}</span>
+            </div>
+            <div class="app-actions">
+                <button class="btn btn-primary btn-sm" onclick="window.storeInstall('${pkg.ici ? pkg.ici.replace(/'/g, "\\'") : ''}')">
+                    Install
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.storeInstall = async function(iciURL) {
+    if (!iciURL) return;
+    try {
+        const ici = await LoadRegistryICI(iciURL);
+        if (ici) {
+            showInstallScreen(ici);
+        }
+    } catch (e) {
+        showToast('Failed to load package: ' + e, 'error');
+    }
+};
+
 function showInstallScreen(ici) {
     currentICI = ici;
     document.getElementById('install-name').textContent = ici.name;
@@ -431,8 +564,6 @@ async function doInstall() {
     document.getElementById('progress-percent').textContent = '0%';
 
     const iciContent = buildICIContent(currentICI);
-
-    showToast('ICI content:\n' + iciContent, 'warning');
 
     try {
         await InstallApp(iciContent, installDir);
