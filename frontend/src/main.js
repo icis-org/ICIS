@@ -420,7 +420,7 @@ function setupInstalled() {
 let storeData = [];
 
 function setupStore() {
-    document.getElementById('btn-store-refresh').addEventListener('click', () => loadStore(true));
+    document.getElementById('btn-store-refresh').addEventListener('click', () => loadStore());
     document.getElementById('btn-store-settings').addEventListener('click', () => {
         const panel = document.getElementById('store-settings-panel');
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
@@ -432,26 +432,26 @@ function setupStore() {
             await SetRegistryURL(url);
             showToast('Registry URL saved', 'success');
             document.getElementById('store-settings-panel').style.display = 'none';
-            loadStore(true);
+            loadStore();
         } catch (e) {
             showToast('Failed to save URL: ' + e, 'error');
         }
     });
     document.getElementById('store-search').addEventListener('input', filterStore);
 
-    loadStore(false);
+    loadStore();
 }
 
-async function loadStore(forceRefresh) {
+async function loadStore() {
     const list = document.getElementById('store-list');
     const status = document.getElementById('store-status');
     list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary)">Loading...</div>';
 
     try {
-        const result = await GetRegistryApps(forceRefresh);
+        const result = await GetRegistryApps();
         storeData = result.index?.packages || [];
-        status.textContent = result.offline
-            ? 'Offline — showing cached data' + (result.error ? ' (' + result.error + ')' : '')
+        status.textContent = result.error
+            ? result.error
             : '';
         renderStore(storeData);
     } catch (e) {

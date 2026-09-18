@@ -45,6 +45,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.database = database
 	a.uninst = uninstaller.New(database)
+	registry.CleanupLegacyCache()
 
 	filePath, autoInstall := parseArgs(os.Args[1:])
 	if filePath != "" {
@@ -364,14 +365,9 @@ func (a *App) SelectDirectory() (string, error) {
 	return dir, nil
 }
 
-func (a *App) GetRegistryApps(forceRefresh bool) registry.RegistryResult {
+func (a *App) GetRegistryApps() registry.RegistryResult {
 	cfg := registry.LoadConfig()
-	url := cfg.RegistryURL
-	if forceRefresh {
-		return registry.FetchIndex(url)
-	}
-	result := registry.FetchIndex(url)
-	return result
+	return registry.FetchIndex(cfg.RegistryURL)
 }
 
 func (a *App) LoadRegistryICI(iciURL string) (*iciparser.ICIFile, error) {

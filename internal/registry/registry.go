@@ -12,36 +12,25 @@ import (
 
 const (
 	DefaultRegistryURL = "https://raw.githubusercontent.com/icis-org/registry/main/registry.json"
-	CacheTTL           = 24 * time.Hour
 	MaxIndexSize       = 5 * 1024 * 1024
 )
 
 type RegistryIndex struct {
-	Name      string            `json:"name"`
-	Packages  []RegistryPackage `json:"packages"`
-	FetchedAt time.Time         `json:"fetchedAt"`
+	Name     string            `json:"name"`
+	Packages []RegistryPackage `json:"packages"`
 }
 
 type RegistryPackage struct {
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	Desc      string `json:"desc"`
-	ICIURL    string `json:"ici"`
-	Homepage  string `json:"homepage"`
+	Name     string `json:"name"`
+	Version  string `json:"version"`
+	Desc     string `json:"desc"`
+	ICIURL   string `json:"ici"`
+	Homepage string `json:"homepage"`
 }
 
 type RegistryResult struct {
-	Index    *RegistryIndex `json:"index"`
-	Offline  bool           `json:"offline"`
-	Error    string         `json:"error,omitempty"`
-}
-
-func cachePath() (string, error) {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(configDir, "ICIS", "registry-cache.json"), nil
+	Index *RegistryIndex `json:"index"`
+	Error string         `json:"error,omitempty"`
 }
 
 func configPath() (string, error) {
@@ -85,75 +74,36 @@ func SaveConfig(cfg RegistryConfig) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func loadCache() (*RegistryIndex, error) {
-	path, err := cachePath()
+func CleanupLegacyCache() {
+	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return nil, err
+		return
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var idx RegistryIndex
-	if err := json.Unmarshal(data, &idx); err != nil {
-		return nil, err
-	}
-	return &idx, nil
-}
-
-func saveCache(idx *RegistryIndex) error {
-	path, err := cachePath()
-	if err != nil {
-		return err
-	}
-	os.MkdirAll(filepath.Dir(path), 0755)
-	data, err := json.MarshalIndent(idx, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
+	os.Remove(filepath.Join(configDir, "ICIS", "registry-cache.json"))
 }
 
 func FetchIndex(url string) RegistryResult {
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
-		cache, cacheErr := loadCache()
-		if cacheErr == nil {
-			return RegistryResult{Index: cache, Offline: true, Error: "network error, using cache"}
-		}
 		return RegistryResult{Error: fmt.Sprintf("fetch failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		cache, cacheErr := loadCache()
-		if cacheErr == nil {
-			return RegistryResult{Index: cache, Offline: true, Error: fmt.Sprintf("HTTP %d, using cache", resp.StatusCode)}
-		}
 		return RegistryResult{Error: fmt.Sprintf("HTTP %d", resp.StatusCode)}
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxIndexSize))
 	if err != nil {
-		cache, cacheErr := loadCache()
-		if cacheErr == nil {
-			return RegistryResult{Index: cache, Offline: true, Error: "read error, using cache"}
-		}
 		return RegistryResult{Error: fmt.Sprintf("read failed: %v", err)}
 	}
 
 	var idx RegistryIndex
 	if err := json.Unmarshal(body, &idx); err != nil {
-		cache, cacheErr := loadCache()
-		if cacheErr == nil {
-			return RegistryResult{Index: cache, Offline: true, Error: "parse error, using cache"}
-		}
 		return RegistryResult{Error: fmt.Sprintf("parse failed: %v", err)}
 	}
 
-	idx.FetchedAt = time.Now()
-	saveCache(&idx)
 	return RegistryResult{Index: &idx}
 }
 
