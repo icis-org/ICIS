@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"icis/internal/arp"
 	"icis/internal/db"
 	"icis/internal/shortcut"
 )
@@ -42,6 +43,8 @@ func (u *Uninstaller) Uninstall(appName string) error {
 			shortcut.RemoveStartupShortcut(app.Shortcut)
 		}
 	}
+
+	arp.Unregister(appName)
 
 	if err := u.database.DeleteApp(appName); err != nil {
 		return fmt.Errorf("failed to remove from database: %w", err)

@@ -4,7 +4,12 @@ import (
 	"context"
 	"embed"
 	"net/url"
+	"os"
 	"strings"
+
+	"icis/internal/arp"
+	"icis/internal/db"
+	"icis/internal/uninstaller"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -16,6 +21,10 @@ import (
 var assets embed.FS
 
 func main() {
+	if headlessUninstall() {
+		return
+	}
+
 	app := NewApp()
 
 	err := wails.Run(&options.App{
@@ -58,6 +67,24 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+}
+
+func headlessUninstall() bool {
+	for i, arg := range os.Args[1:] {
+		if arg == "--uninstall" && i+1 < len(os.Args)-1 {
+			appName := os.Args[i+2]
+			database, err := db.Open()
+			if err != nil {
+				os.Exit(1)
+			}
+			inst := uninstaller.New(database)
+			inst.Uninstall(appName)
+			database.Close()
+			arp.SweepOrphans()
+			return true
+		}
+	}
+	return false
 }
 
 func parseArgs(args []string) (filePath string, autoInstall bool, protocolURL string) {

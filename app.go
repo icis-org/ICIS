@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"icis/internal/arp"
 	"icis/internal/db"
 	"icis/internal/iciparser"
 	"icis/internal/downloader"
@@ -49,6 +50,7 @@ func (a *App) startup(ctx context.Context) {
 	a.database = database
 	a.uninst = uninstaller.New(database)
 	registry.CleanupLegacyCache()
+	arp.Backfill(database)
 
 	filePath, autoInstall, protocolURL := parseArgs(os.Args[1:])
 	if protocolURL != "" {
@@ -367,6 +369,8 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 	if err := a.database.SaveApp(app); err != nil {
 		return fmt.Errorf("failed to save to database: %w", err)
 	}
+
+	arp.Register(app)
 
 	runtime.EventsEmit(a.ctx, "install-complete", map[string]string{
 		"name":  ici.Name,

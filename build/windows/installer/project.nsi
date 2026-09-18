@@ -126,6 +126,20 @@ Section "uninstall"
     ; Remove icis:// protocol handler
     DeleteRegKey SHELL_CONTEXT "Software\Classes\icis"
 
+    ; Sweep orphan ICIS_* ARP entries
+    StrCpy $0 0
+    arp_loop:
+        EnumRegKey $1 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall" $0
+        StrCmp $1 "" arp_done
+        StrCpy $2 $1 5
+        StrCmp $2 "ICIS_" 0 arp_next
+        DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1"
+        goto arp_loop
+    arp_next:
+        IntOp $0 $0 + 1
+        goto arp_loop
+    arp_done:
+
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 
     RMDir /r $INSTDIR
