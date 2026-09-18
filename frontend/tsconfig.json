@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "composite": true,
+    "declaration": false,
+    "declarationMap": true,
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "moduleDetection": "auto",
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "target": "ES2022",
+    "types": ["vite/client"],
+    "lib": ["DOM", "DOM.Iterable", "ES2024"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte", "frontend/wailsjs/**/*.ts"],
+  "references": [
+    { "path": "./tsconfig.node.json" }
+  ]
+}

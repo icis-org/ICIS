@@ -64,6 +64,7 @@ function layout() {
     return `
     <div class="sidebar">
         <div class="sidebar-header">
+            <img src="./public/favicon.png" alt="ICIS" style="width:28px;height:28px;border-radius:4px;margin-bottom:4px"/>
             <h1>ICIS</h1>
             <div class="subtitle">Configurable Install System</div>
         </div>
