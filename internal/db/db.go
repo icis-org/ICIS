@@ -18,9 +18,15 @@ type InstalledApp struct {
 	InstallPath string   `json:"installPath"`
 	Files       []string `json:"files"`
 	Shortcut    string   `json:"shortcut"`
+	Shortcuts   []ShortcutLink `json:"shortcuts"`
 	Startup     bool     `json:"startup"`
 	InstalledAt string   `json:"installedAt"`
 	ICISource   string   `json:"iciSource"`
+}
+
+type ShortcutLink struct {
+	Exe  string `json:"exe"`
+	Name string `json:"name"`
 }
 
 type DB struct {
@@ -82,11 +88,24 @@ func (db *DB) migrate() error {
 		db.conn.Exec("PRAGMA user_version = 1")
 	}
 
+	if version < 2 {
+		_, err := db.conn.Exec(`ALTER TABLE installs ADD COLUMN shortcuts TEXT NOT NULL DEFAULT '[]'`)
+		if err != nil {
+			return err
+		}
+		db.conn.Exec("PRAGMA user_version = 2")
+	}
+
 	return nil
 }
 
 func (db *DB) SaveApp(app InstalledApp) error {
 	filesJSON, err := json.Marshal(app.Files)
+	if err != nil {
+		return err
+	}
+
+	shortcutsJSON, err := json.Marshal(app.Shortcuts)
 	if err != nil {
 		return err
 	}
@@ -101,24 +120,25 @@ func (db *DB) SaveApp(app InstalledApp) error {
 	}
 
 	_, err = db.conn.Exec(`
-		INSERT OR REPLACE INTO installs (name, version, install_path, files, shortcut, startup, installed_at, ici_source)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, app.Name, app.Version, app.InstallPath, string(filesJSON), app.Shortcut, startupInt, app.InstalledAt, app.ICISource)
+		INSERT OR REPLACE INTO installs (name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, app.Name, app.Version, app.InstallPath, string(filesJSON), app.Shortcut, string(shortcutsJSON), startupInt, app.InstalledAt, app.ICISource)
 
 	return err
 }
 
 func (db *DB) GetApp(name string) (*InstalledApp, error) {
 	row := db.conn.QueryRow(`
-		SELECT id, name, version, install_path, files, shortcut, startup, installed_at, ici_source
+		SELECT id, name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source
 		FROM installs WHERE name = ?
 	`, name)
 
 	var app InstalledApp
 	var filesJSON string
+	var shortcutsJSON string
 	var startupInt int
 
-	err := row.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &startupInt, &app.InstalledAt, &app.ICISource)
+	err := row.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &shortcutsJSON, &startupInt, &app.InstalledAt, &app.ICISource)
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +147,16 @@ func (db *DB) GetApp(name string) (*InstalledApp, error) {
 	if err := json.Unmarshal([]byte(filesJSON), &app.Files); err != nil {
 		app.Files = []string{}
 	}
+	if err := json.Unmarshal([]byte(shortcutsJSON), &app.Shortcuts); err != nil {
+		app.Shortcuts = []ShortcutLink{}
+	}
 
 	return &app, nil
 }
 
 func (db *DB) ListApps() ([]InstalledApp, error) {
 	rows, err := db.conn.Query(`
-		SELECT id, name, version, install_path, files, shortcut, startup, installed_at, ici_source
+		SELECT id, name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source
 		FROM installs ORDER BY name
 	`)
 	if err != nil {
@@ -145,15 +168,19 @@ func (db *DB) ListApps() ([]InstalledApp, error) {
 	for rows.Next() {
 		var app InstalledApp
 		var filesJSON string
+		var shortcutsJSON string
 		var startupInt int
 
-		if err := rows.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &startupInt, &app.InstalledAt, &app.ICISource); err != nil {
+		if err := rows.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &shortcutsJSON, &startupInt, &app.InstalledAt, &app.ICISource); err != nil {
 			return nil, err
 		}
 
 		app.Startup = startupInt == 1
 		if err := json.Unmarshal([]byte(filesJSON), &app.Files); err != nil {
 			app.Files = []string{}
+		}
+		if err := json.Unmarshal([]byte(shortcutsJSON), &app.Shortcuts); err != nil {
+			app.Shortcuts = []ShortcutLink{}
 		}
 
 		apps = append(apps, app)

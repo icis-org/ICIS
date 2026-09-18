@@ -437,6 +437,12 @@
     border: 1px solid rgba(244, 91, 105, 0.3);
 }
 
+.toast.warning {
+    background: rgba(240, 168, 48, 0.15);
+    color: var(--warning);
+    border: 1px solid rgba(240, 168, 48, 0.3);
+}
+
 @keyframes slideUp {
     from { transform: translateY(20px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }

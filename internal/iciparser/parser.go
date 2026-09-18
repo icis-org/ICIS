@@ -19,9 +19,32 @@ type ICIFile struct {
 	CustomDir   string   `json:"customDir"`
 	Files       []string `json:"files"`
 	Shortcut    string   `json:"shortcut"`
+	Shortcuts   []ShortcutEntry `json:"shortcuts"`
 	Startup     bool     `json:"startup"`
 	Icon        string   `json:"icon"`
 	Homepage    string   `json:"homepage"`
+}
+
+type ShortcutEntry struct {
+	Exe string `json:"exe"`
+	Name string `json:"name"`
+}
+
+func ParseShortcutEntry(raw string) ShortcutEntry {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ShortcutEntry{}
+	}
+	parts := strings.SplitN(raw, "=", 2)
+	exe := strings.TrimSpace(parts[0])
+	if strings.EqualFold(filepath.Ext(exe), ".lnk") {
+		exe = strings.TrimSuffix(exe, filepath.Ext(exe))
+	}
+	name := strings.TrimSuffix(filepath.Base(exe), filepath.Ext(exe))
+	if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+		name = strings.TrimSpace(parts[1])
+	}
+	return ShortcutEntry{Exe: exe, Name: name}
 }
 
 func Parse(filePath string) (*ICIFile, error) {
@@ -79,6 +102,13 @@ func Parse(filePath string) (*ICIFile, error) {
 			}
 		case "shortcut":
 			ici.Shortcut = value
+		case "shortcuts":
+			for _, s := range strings.Split(value, ",") {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					ici.Shortcuts = append(ici.Shortcuts, ParseShortcutEntry(s))
+				}
+			}
 		case "startup":
 			ici.Startup = strings.ToLower(value) == "true"
 		case "icon":
@@ -176,6 +206,13 @@ func ParseString(content string) (*ICIFile, error) {
 			}
 		case "shortcut":
 			ici.Shortcut = value
+		case "shortcuts":
+			for _, s := range strings.Split(value, ",") {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					ici.Shortcuts = append(ici.Shortcuts, ParseShortcutEntry(s))
+				}
+			}
 		case "startup":
 			ici.Startup = strings.ToLower(value) == "true"
 		case "icon":

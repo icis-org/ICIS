@@ -132,8 +132,8 @@ function screenCreate() {
                 </div>
             </div>
             <div class="form-group">
-                <label>Shortcut Name</label>
-                <input type="text" id="ici-shortcut" placeholder="Name for desktop shortcut"/>
+                <label>Shortcuts (one per line: exe.exe=Display Name)</label>
+                <textarea id="ici-shortcuts" placeholder="mpv.exe=MPV Player&#10;tools/recorder.exe=Recorder" style="width:100%;height:80px;padding:12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12px;font-family:monospace;resize:vertical;outline:none"></textarea>
             </div>
             <div class="form-group">
                 <div class="checkbox-row">
@@ -167,6 +167,10 @@ function screenInstall() {
             <div class="detail-row">
                 <span class="detail-label">Archive Type</span>
                 <span class="detail-value" id="install-type"></span>
+            </div>
+            <div id="install-shortcuts-section" style="display:none;margin-top:12px">
+                <label style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Shortcuts</label>
+                <div id="install-shortcuts-list" style="margin-top:6px;font-size:13px;color:var(--text-primary)"></div>
             </div>
             <div style="margin-top:15px">
                 <label style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Install Location</label>
@@ -308,7 +312,7 @@ function setupInstall() {
 }
 
 function setupCreate() {
-    const fields = ['ici-name', 'ici-version', 'ici-desc', 'ici-url', 'ici-type', 'ici-install-dir', 'ici-shortcut', 'ici-startup'];
+    const fields = ['ici-name', 'ici-version', 'ici-desc', 'ici-url', 'ici-type', 'ici-install-dir', 'ici-shortcuts', 'ici-startup'];
     fields.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -351,7 +355,7 @@ function updateCreatePreview() {
     const url = document.getElementById('ici-url').value;
     const type = document.getElementById('ici-type').value;
     const installDir = document.getElementById('ici-install-dir').value;
-    const shortcut = document.getElementById('ici-shortcut').value;
+    const shortcutsText = document.getElementById('ici-shortcuts').value.trim();
     const startup = document.getElementById('ici-startup').checked;
 
     let lines = [];
@@ -361,7 +365,10 @@ function updateCreatePreview() {
     if (url) lines.push(`url: ${url}`);
     if (type) lines.push(`type: ${type}`);
     lines.push(`install_dir: ${installDir}`);
-    if (shortcut) lines.push(`shortcut: ${shortcut}`);
+    if (shortcutsText) {
+        const entries = shortcutsText.split('\n').map(s => s.trim()).filter(s => s);
+        if (entries.length) lines.push(`shortcuts: ${entries.join(', ')}`);
+    }
     lines.push(`startup: ${startup}`);
 
     document.getElementById('ici-preview').value = lines.join('\n');
@@ -378,6 +385,22 @@ function showInstallScreen(ici) {
     document.getElementById('install-desc').textContent = ici.desc || '';
     document.getElementById('install-url').textContent = ici.url;
     document.getElementById('install-type').textContent = (ici.type || 'zip').toUpperCase();
+
+    const shortcutsSection = document.getElementById('install-shortcuts-section');
+    const shortcutsList = document.getElementById('install-shortcuts-list');
+    if (ici.shortcuts && ici.shortcuts.length > 0) {
+        shortcutsSection.style.display = 'block';
+        shortcutsList.innerHTML = ici.shortcuts.map(s => {
+            const name = s.name || s.Name || s;
+            return `<div style="padding:4px 0">  ${name}</div>`;
+        }).join('');
+    } else if (ici.shortcut) {
+        shortcutsSection.style.display = 'block';
+        shortcutsList.innerHTML = `<div style="padding:4px 0">  ${ici.shortcut}</div>`;
+    } else {
+        shortcutsSection.style.display = 'none';
+        shortcutsList.innerHTML = '';
+    }
 
     document.getElementById('progress-section').style.display = 'none';
     document.getElementById('progress-bar').style.width = '0%';
@@ -407,7 +430,9 @@ async function doInstall() {
     document.getElementById('progress-text').textContent = 'Preparing installation...';
     document.getElementById('progress-percent').textContent = '0%';
 
-    const iciContent = document.getElementById('ici-preview')?.value || buildICIContent(currentICI);
+    const iciContent = buildICIContent(currentICI);
+
+    showToast('ICI content:\n' + iciContent, 'warning');
 
     try {
         await InstallApp(iciContent, installDir);
@@ -430,7 +455,16 @@ function buildICIContent(ici) {
     if (selectedDir === 'custom') {
         lines.push(`custom_dir: ${document.getElementById('custom-dir-input')?.value || ''}`);
     }
-    if (ici.shortcut) lines.push(`shortcut: ${ici.shortcut}`);
+    if (ici.shortcuts && ici.shortcuts.length > 0) {
+        const entries = ici.shortcuts.map(s => {
+            const exe = s.exe || s.Exe || s;
+            const name = s.name || s.Name || s;
+            return exe === name ? exe : `${exe}=${name}`;
+        });
+        lines.push(`shortcuts: ${entries.join(', ')}`);
+    } else if (ici.shortcut) {
+        lines.push(`shortcut: ${ici.shortcut}`);
+    }
     lines.push(`startup: ${ici.startup || false}`);
     return lines.join('\n');
 }
@@ -507,7 +541,11 @@ function listenEvents() {
             shortcut: 'Creating shortcuts...',
             saving: 'Saving installation record...',
         };
-        document.getElementById('progress-text').textContent = data.message || statusMessages[data.status] || data.status;
+        const msg = data.message || statusMessages[data.status] || data.status;
+        document.getElementById('progress-text').textContent = msg;
+        if (data.status === 'shortcut-warning') {
+            showToast(msg, 'warning');
+        }
     });
 
     EventsOn('extract-progress', (data) => {

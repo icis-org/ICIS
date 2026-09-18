@@ -27,13 +27,20 @@ func (u *Uninstaller) Uninstall(appName string) error {
 		return fmt.Errorf("failed to remove files: %w", err)
 	}
 
-	if app.Shortcut != "" {
+	if len(app.Shortcuts) > 0 {
+		for i, sl := range app.Shortcuts {
+			shortcut.RemoveDesktopShortcut(sl.Name)
+			shortcut.RemoveStartMenuShortcut(sl.Name)
+			if app.Startup && i == 0 {
+				shortcut.RemoveStartupShortcut(sl.Name)
+			}
+		}
+	} else if app.Shortcut != "" {
 		shortcut.RemoveDesktopShortcut(app.Shortcut)
 		shortcut.RemoveStartMenuShortcut(app.Shortcut)
-	}
-
-	if app.Startup {
-		shortcut.RemoveStartupShortcut(app.Shortcut)
+		if app.Startup {
+			shortcut.RemoveStartupShortcut(app.Shortcut)
+		}
 	}
 
 	if err := u.database.DeleteApp(appName); err != nil {

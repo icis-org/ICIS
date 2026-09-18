@@ -197,7 +197,55 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 		"message": "Creating shortcuts...",
 	})
 
-	if ici.Shortcut != "" {
+	var shortcutLinks []db.ShortcutLink
+
+	if len(ici.Shortcuts) > 0 {
+		for i, entry := range ici.Shortcuts {
+			configExe := strings.ToLower(entry.Exe)
+			configBase := strings.ToLower(filepath.Base(entry.Exe))
+			matched := ""
+			bestLen := 0
+			for _, f := range relativeFiles {
+				fNorm := strings.ToLower(strings.ReplaceAll(f, "\\", "/"))
+				fBase := strings.ToLower(filepath.Base(f))
+				if fNorm == configExe || fBase == configBase {
+					if matched == "" || len(fNorm) < bestLen {
+						matched = f
+						bestLen = len(fNorm)
+					}
+				}
+			}
+			if matched == "" {
+				runtime.EventsEmit(a.ctx, "install-progress", map[string]string{
+					"status":  "shortcut-warning",
+					"message": "Exe not found in archive: " + entry.Exe + " (looked for: " + configBase + ")",
+				})
+				continue
+			}
+			targetPath := filepath.Join(destPath, matched)
+			if err := shortcut.CreateDesktopShortcut(entry.Name, targetPath, ""); err != nil {
+				runtime.EventsEmit(a.ctx, "install-progress", map[string]string{
+					"status":  "shortcut-warning",
+					"message": "Failed to create desktop shortcut: " + err.Error(),
+				})
+			}
+			if err := shortcut.CreateStartMenuShortcut(entry.Name, targetPath, ""); err != nil {
+				runtime.EventsEmit(a.ctx, "install-progress", map[string]string{
+					"status":  "shortcut-warning",
+					"message": "Failed to create start menu shortcut: " + err.Error(),
+				})
+			}
+			if ici.Startup && i == 0 {
+				if err := shortcut.CreateStartupShortcut(entry.Name, targetPath, ""); err != nil {
+					runtime.EventsEmit(a.ctx, "install-progress", map[string]string{
+						"status":  "shortcut-warning",
+						"message": "Failed to create startup shortcut: " + err.Error(),
+					})
+				}
+			}
+			shortcutLinks = append(shortcutLinks, db.ShortcutLink{Exe: matched, Name: entry.Name})
+		}
+	} else if ici.Shortcut != "" {
 		mainExe := ""
 		for _, f := range relativeFiles {
 			if strings.HasSuffix(strings.ToLower(f), ".exe") {
@@ -209,10 +257,10 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 			targetPath := filepath.Join(destPath, mainExe)
 			shortcut.CreateDesktopShortcut(ici.Shortcut, targetPath, "")
 			shortcut.CreateStartMenuShortcut(ici.Shortcut, targetPath, "")
-
 			if ici.Startup {
 				shortcut.CreateStartupShortcut(ici.Shortcut, targetPath, "")
 			}
+			shortcutLinks = append(shortcutLinks, db.ShortcutLink{Exe: mainExe, Name: ici.Shortcut})
 		}
 	}
 
@@ -235,6 +283,7 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 		InstallPath: destPath,
 		Files:       relativeFiles,
 		Shortcut:    ici.Shortcut,
+		Shortcuts:   shortcutLinks,
 		Startup:     ici.Startup,
 		ICISource:   iciSource,
 	}
