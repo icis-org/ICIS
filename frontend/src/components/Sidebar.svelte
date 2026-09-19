@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../lib/state.svelte';
   import type { Screen } from '../lib/state.svelte';
+  import favicon from '../assets/favicon.png';
 
   const navItems: Array<{ screen: Screen; label: string; icon: string }> = [
     { screen: 'home', label: 'Home', icon: 'home' },
@@ -16,7 +17,7 @@
 
 <aside class="sidebar">
   <div class="sidebar-header">
-    <img src="./favicon.png" alt="ICIS" class="sidebar-logo" />
+    <img src={favicon} alt="ICIS" class="sidebar-logo" />
     <div class="sidebar-brand">
       <h1 class="sidebar-title">ICIS</h1>
       <div class="sidebar-subtitle">Configurable Install System</div>

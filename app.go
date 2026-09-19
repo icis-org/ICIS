@@ -49,7 +49,6 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.database = database
 	a.uninst = uninstaller.New(database)
-	registry.CleanupLegacyCache()
 	arp.Backfill(database)
 
 	filePath, autoInstall, protocolURL := parseArgs(os.Args[1:])

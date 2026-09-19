@@ -74,17 +74,15 @@ func SaveConfig(cfg RegistryConfig) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func CleanupLegacyCache() {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return
-	}
-	os.Remove(filepath.Join(configDir, "ICIS", "registry-cache.json"))
-}
-
 func FetchIndex(url string) RegistryResult {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return RegistryResult{Error: fmt.Sprintf("request failed: %v", err)}
+	}
+	req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	req.Header.Set("Pragma", "no-cache")
+	resp, err := client.Do(req)
 	if err != nil {
 		return RegistryResult{Error: fmt.Sprintf("fetch failed: %v", err)}
 	}
@@ -109,7 +107,13 @@ func FetchIndex(url string) RegistryResult {
 
 func FetchICI(url string) (string, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("request failed: %w", err)
+	}
+	req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	req.Header.Set("Pragma", "no-cache")
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch .ici: %w", err)
 	}
