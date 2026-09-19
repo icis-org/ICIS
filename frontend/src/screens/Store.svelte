@@ -62,11 +62,13 @@
     try {
       const ici = await LoadRegistryICI(iciUrl);
       if (ici) {
-        if (!app.wizardMode) {
-          app.wizardMode = true;
-          await EnterWizardMode();
-        }
         app.setICI(ici, iciUrl);
+        app.setWizardStep('confirm');
+        app.setInstalling(false);
+        app.setWizardMode(true);
+        await EnterWizardMode();
+      } else {
+        toasts.add('Failed to load package: no data returned', 'error');
       }
     } catch (e) {
       toasts.add('Failed to load package: ' + e, 'error');
