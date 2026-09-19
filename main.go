@@ -37,10 +37,10 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:      "ICIS - Isam's Configurable Install System",
-		Width:      800,
-		Height:     600,
-		MinWidth:   700,
-		MinHeight:  500,
+		Width:      960,
+		Height:     640,
+		MinWidth:   800,
+		MinHeight:  540,
 		Frameless:  true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
