@@ -1,13 +1,31 @@
 package pack
 
 import (
+	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
+
+var output io.Writer = os.Stderr
+
+func SetOutput(w io.Writer) {
+	output = w
+}
+
+func printf(format string, args ...interface{}) {
+	fmt.Fprintf(output, format, args...)
+}
+
+func println(args ...interface{}) {
+	fmt.Fprintln(output, args...)
+}
 
 var magic = []byte("ICIS")
 
@@ -67,11 +85,12 @@ func Pack(iciPath string, outputPath string, stubBinary []byte, installerBinary 
 	// Print result
 	info, _ := os.Stat(absOutput)
 	sizeMB := float64(info.Size()) / 1024 / 1024
-	fmt.Printf("Standalone installer created: %s (%.1f MB)\n", absOutput, sizeMB)
+	printf("Standalone installer created: %s (%.1f MB)\n", absOutput, sizeMB)
 	return nil
 }
 
 // FindInstaller looks for the ICIS NSIS installer relative to the ICIS executable.
+// If not found locally, downloads from GitHub releases.
 func FindInstaller() (string, error) {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -109,5 +128,58 @@ func FindInstaller() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("ICIS installer not found — expected icis-amd64-installer.exe next to icis.exe")
+	// Not found locally — download from GitHub releases
+	return downloadInstaller(exeDir)
+}
+
+const icisReleaseURL = "https://github.com/icis-org/icis/releases/latest/download/icis-amd64-installer.exe"
+
+func downloadInstaller(targetDir string) (string, error) {
+	destPath := filepath.Join(targetDir, "icis-amd64-installer.exe")
+
+	println("ICIS installer not found locally. Downloading from GitHub...")
+
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: false}}
+	client := &http.Client{Transport: tr, Timeout: 120 * time.Second}
+
+	resp, err := client.Get(icisReleaseURL)
+	if err != nil {
+		return "", fmt.Errorf("download failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
+	}
+
+	f, err := os.Create(destPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create file: %w", err)
+	}
+	defer f.Close()
+
+	total := resp.ContentLength
+	written := int64(0)
+	buf := make([]byte, 32*1024)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			f.Write(buf[:n])
+			written += int64(n)
+			if total > 0 {
+				pct := float64(written) / float64(total) * 100
+				fmt.Fprintf(output, "\rDownloading ICIS installer... %.0f%%", pct)
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
+			return "", readErr
+		}
+	}
+	println()
+	f.Close()
+
+	return destPath, nil
 }

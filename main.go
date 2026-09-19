@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"icis/internal/arp"
 	"icis/internal/db"
@@ -24,6 +25,35 @@ var assets embed.FS
 
 //go:embed internal/pack/stub.exe
 var stubBinary []byte
+
+var consoleHandle uintptr
+
+func attachConsole() {
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	allocConsole := kernel32.NewProc("AllocConsole")
+	allocConsole.Call()
+	getStdHandle := kernel32.NewProc("GetStdHandle")
+	hOut, _, _ := getStdHandle.Call(^uintptr(11) + 1)
+	if hOut != 0 && hOut != uintptr(0xFFFFFFFFFFFFFFFF) {
+		consoleHandle = hOut
+	}
+}
+
+func consolePrint(msg string) {
+	if consoleHandle != 0 {
+		b := []byte(msg)
+		syscall.Write(syscall.Handle(consoleHandle), b)
+	}
+}
+
+type consoleWriter struct{}
+
+func (consoleWriter) Write(p []byte) (int, error) {
+	if consoleHandle != 0 {
+		syscall.Write(syscall.Handle(consoleHandle), p)
+	}
+	return len(p), nil
+}
 
 func main() {
 	if headlessPack() {
@@ -83,9 +113,11 @@ func main() {
 func headlessUninstall() bool {
 	for i, arg := range os.Args[1:] {
 		if arg == "--uninstall" && i+1 < len(os.Args)-1 {
+			attachConsole()
 			appName := os.Args[i+2]
 			database, err := db.Open()
 			if err != nil {
+				consolePrint("Error: cannot open database: " + err.Error() + "\n")
 				os.Exit(1)
 			}
 			inst := uninstaller.New(database)
@@ -101,9 +133,11 @@ func headlessUninstall() bool {
 func headlessPack() bool {
 	for i, arg := range os.Args[1:] {
 		if arg == "pack" {
+			attachConsole()
+			pack.SetOutput(consoleWriter{})
 			args := os.Args[i+2:]
 			if len(args) < 1 {
-				println("Usage: icis pack <input.ici> [-o output.exe]")
+				consolePrint("Usage: icis pack <input.ici> [-o output.exe]\n")
 				os.Exit(1)
 			}
 			iciPath := args[0]
@@ -116,17 +150,17 @@ func headlessPack() bool {
 
 			installerPath, err := pack.FindInstaller()
 			if err != nil {
-				println("Error:", err.Error())
+				consolePrint("Error: " + err.Error() + "\n")
 				os.Exit(1)
 			}
 			installerBinary, err := os.ReadFile(installerPath)
 			if err != nil {
-				println("Error: cannot read ICIS installer:", err.Error())
+				consolePrint("Error: cannot read ICIS installer: " + err.Error() + "\n")
 				os.Exit(1)
 			}
 
 			if err := pack.Pack(iciPath, outputPath, stubBinary, installerBinary); err != nil {
-				println("Error:", err.Error())
+				consolePrint("Error: " + err.Error() + "\n")
 				os.Exit(1)
 			}
 			return true
