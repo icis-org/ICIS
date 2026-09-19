@@ -102,6 +102,10 @@ Section
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
 
+    ; Add ICIS install directory to user PATH
+    ReadRegStr $0 HKCU "Environment" "Path"
+    WriteRegStr HKCU "Environment" "Path" "$0;$INSTDIR"
+
     ; "Install with ICIS" context menu for .ici files
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "" "Install with ICIS"
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "Icon" "$INSTDIR\${PRODUCT_EXECUTABLE},0"
@@ -119,6 +123,19 @@ SectionEnd
 
 Section "uninstall"
     !insertmacro wails.setShellContext
+
+    ; Remove ICIS install directory from user PATH
+    ; Write a temp PowerShell script and run it
+    FileOpen $0 "$TEMP\icis-remove-path.ps1" w
+    FileWrite $0 '$$p = [Environment]::GetEnvironmentVariable("Path","User")'
+    FileWrite $0 "`r`n"
+    FileWrite $0 '$$parts = $$p -split ";" | Where-Object { $$_.TrimEnd("\") -ne "$INSTDIR".TrimEnd("\") }'
+    FileWrite $0 "`r`n"
+    FileWrite $0 '[Environment]::SetEnvironmentVariable("Path", ($$parts -join ";"), "User")'
+    FileWrite $0 "`r`n"
+    FileClose $0
+    ExecWait 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$TEMP\icis-remove-path.ps1"'
+    Delete "$TEMP\icis-remove-path.ps1"
 
     ; Remove "Install with ICIS" context menu
     DeleteRegKey SHELL_CONTEXT "Software\Classes\.ici\shell\install"
