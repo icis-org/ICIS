@@ -102,10 +102,20 @@ Section
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
 
+    ; Add ICIS install directory to user PATH
+    EnVar::AddValue "PATH" "$INSTDIR"
+
     ; "Install with ICIS" context menu for .ici files
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "" "Install with ICIS"
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install" "Icon" "$INSTDIR\${PRODUCT_EXECUTABLE},0"
     WriteRegStr SHELL_CONTEXT "Software\Classes\.ici\shell\install\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" --install "%1"'
+
+    ; icis:// protocol handler
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis" "" "URL:ICIS Protocol"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis" "URL Protocol" ""
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis" "EditFlags" "0"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis\DefaultIcon" "" "$INSTDIR\${PRODUCT_EXECUTABLE},0"
+    WriteRegStr SHELL_CONTEXT "Software\Classes\icis\shell\open\command" "" '"$INSTDIR\${PRODUCT_EXECUTABLE}" "%1"'
 
     !insertmacro wails.writeUninstaller
 SectionEnd
@@ -113,8 +123,28 @@ SectionEnd
 Section "uninstall"
     !insertmacro wails.setShellContext
 
+    ; Remove ICIS install directory from user PATH
+    EnVar::DeleteValue "PATH" "$INSTDIR"
+
     ; Remove "Install with ICIS" context menu
     DeleteRegKey SHELL_CONTEXT "Software\Classes\.ici\shell\install"
+
+    ; Remove icis:// protocol handler
+    DeleteRegKey SHELL_CONTEXT "Software\Classes\icis"
+
+    ; Sweep orphan ICIS_* ARP entries
+    StrCpy $0 0
+    arp_loop:
+        EnumRegKey $1 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall" $0
+        StrCmp $1 "" arp_done
+        StrCpy $2 $1 5
+        StrCmp $2 "ICIS_" 0 arp_next
+        DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1"
+        goto arp_loop
+    arp_next:
+        IntOp $0 $0 + 1
+        goto arp_loop
+    arp_done:
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 

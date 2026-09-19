@@ -1,46 +1,304 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* ============================================
+   ICIS Design System
+   Modern glassmorphic dark theme with Inter
+   ============================================ */
 
 :root {
-    --bg-primary: #0f0f14;
-    --bg-secondary: #16161e;
-    --bg-tertiary: #1e1e2a;
-    --bg-card: #1a1a26;
-    --bg-hover: #242436;
-    --text-primary: #e4e4ef;
-    --text-secondary: #9191a8;
-    --text-muted: #5e5e78;
-    --accent: #7c5cfc;
-    --accent-hover: #6a4be0;
-    --accent-glow: rgba(124, 92, 252, 0.15);
-    --success: #3dd68c;
-    --success-bg: rgba(61, 214, 140, 0.1);
-    --danger: #f45b69;
-    --danger-bg: rgba(244, 91, 105, 0.1);
-    --warning: #f0a830;
-    --border: #2a2a3c;
-    --radius: 10px;
-    --radius-sm: 6px;
+    /* Color Palette — layered dark tones */
+    --bg-base: #0D0E12;
+    --bg-panel: #161822;
+    --bg-card: #1E202E;
+    --bg-input: #1E202E;
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --bg-active: rgba(124, 58, 237, 0.12);
+
+    /* Text */
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+
+    /* Accent */
+    --accent: #7C3AED;
+    --accent-hover: #6D28D9;
+    --accent-gradient: linear-gradient(135deg, #7C3AED, #6366F1);
+    --accent-glow: rgba(124, 58, 237, 0.15);
+    --accent-glow-strong: rgba(124, 58, 237, 0.3);
+
+    /* Semantic */
+    --success: #34D399;
+    --success-bg: rgba(52, 211, 153, 0.1);
+    --danger: #F87171;
+    --danger-bg: rgba(248, 113, 113, 0.1);
+    --warning: #FBBF24;
+
+    /* Borders */
+    --border: rgba(255, 255, 255, 0.08);
+    --border-highlight: rgba(255, 255, 255, 0.12);
+    --border-focus: #7C3AED;
+
+    /* Radii */
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+
+    /* Typography */
+    --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-size-xs: 12px;
+    --font-size-sm: 13px;
+    --font-size-base: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+    --font-size-2xl: 24px;
+    --font-size-3xl: 28px;
+
+    /* Spacing */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 20px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 40px;
 }
 
+/* Typography Setup */
 html {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-primary);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 body {
+    background: var(--bg-base);
     margin: 0;
     overflow: hidden;
     height: 100vh;
-    user-select: none;
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
 }
 
 #app {
     height: 100vh;
+    overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* Focus */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ============================================
+   Glass Panel Utility
+   ============================================ */
+.glass-panel {
+    background: rgba(22, 24, 34, 0.75);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--border-highlight);
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+.btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    outline: none;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: var(--accent-gradient);
+    color: white;
+    box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 24px var(--accent-glow-strong);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
+}
+
+.btn-danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.btn-danger:hover {
+    background: rgba(248, 113, 113, 0.2);
+    transform: translateY(-1px);
+}
+
+.btn-sm {
+    padding: 7px 14px;
+    font-size: var(--font-size-xs);
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* ============================================
+   Form Elements
+   ============================================ */
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-group label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+    transition: all 0.15s ease-in-out;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.form-row {
     display: flex;
+    gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+/* ============================================
+   Segmented Radio Controls
+   ============================================ */
+.segment-group {
+    display: flex;
+    gap: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+}
+
+.segment-item {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    font-family: inherit;
+    text-align: center;
+}
+
+.segment-item:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.segment-item.selected {
+    background: var(--accent-glow);
+    color: var(--accent);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ============================================
+   Checkbox
+   ============================================ */
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: 5px;
+}
+
+.checkbox-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    border-radius: 4px;
+}
+
+.checkbox-row label {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-bottom: 0;
 }

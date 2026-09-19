@@ -22,6 +22,7 @@ type InstalledApp struct {
 	Startup     bool     `json:"startup"`
 	InstalledAt string   `json:"installedAt"`
 	ICISource   string   `json:"iciSource"`
+	Homepage    string   `json:"homepage"`
 }
 
 type ShortcutLink struct {
@@ -96,6 +97,14 @@ func (db *DB) migrate() error {
 		db.conn.Exec("PRAGMA user_version = 2")
 	}
 
+	if version < 3 {
+		_, err := db.conn.Exec(`ALTER TABLE installs ADD COLUMN homepage TEXT NOT NULL DEFAULT ''`)
+		if err != nil {
+			return err
+		}
+		db.conn.Exec("PRAGMA user_version = 3")
+	}
+
 	return nil
 }
 
@@ -120,16 +129,16 @@ func (db *DB) SaveApp(app InstalledApp) error {
 	}
 
 	_, err = db.conn.Exec(`
-		INSERT OR REPLACE INTO installs (name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, app.Name, app.Version, app.InstallPath, string(filesJSON), app.Shortcut, string(shortcutsJSON), startupInt, app.InstalledAt, app.ICISource)
+		INSERT OR REPLACE INTO installs (name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source, homepage)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, app.Name, app.Version, app.InstallPath, string(filesJSON), app.Shortcut, string(shortcutsJSON), startupInt, app.InstalledAt, app.ICISource, app.Homepage)
 
 	return err
 }
 
 func (db *DB) GetApp(name string) (*InstalledApp, error) {
 	row := db.conn.QueryRow(`
-		SELECT id, name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source
+		SELECT id, name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source, homepage
 		FROM installs WHERE name = ?
 	`, name)
 
@@ -138,7 +147,7 @@ func (db *DB) GetApp(name string) (*InstalledApp, error) {
 	var shortcutsJSON string
 	var startupInt int
 
-	err := row.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &shortcutsJSON, &startupInt, &app.InstalledAt, &app.ICISource)
+	err := row.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &shortcutsJSON, &startupInt, &app.InstalledAt, &app.ICISource, &app.Homepage)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +165,7 @@ func (db *DB) GetApp(name string) (*InstalledApp, error) {
 
 func (db *DB) ListApps() ([]InstalledApp, error) {
 	rows, err := db.conn.Query(`
-		SELECT id, name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source
+		SELECT id, name, version, install_path, files, shortcut, shortcuts, startup, installed_at, ici_source, homepage
 		FROM installs ORDER BY name
 	`)
 	if err != nil {
@@ -171,7 +180,7 @@ func (db *DB) ListApps() ([]InstalledApp, error) {
 		var shortcutsJSON string
 		var startupInt int
 
-		if err := rows.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &shortcutsJSON, &startupInt, &app.InstalledAt, &app.ICISource); err != nil {
+		if err := rows.Scan(&app.ID, &app.Name, &app.Version, &app.InstallPath, &filesJSON, &app.Shortcut, &shortcutsJSON, &startupInt, &app.InstalledAt, &app.ICISource, &app.Homepage); err != nil {
 			return nil, err
 		}
 

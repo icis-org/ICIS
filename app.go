@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"icis/internal/arp"
 	"icis/internal/db"
 	"icis/internal/iciparser"
 	"icis/internal/downloader"
 	"icis/internal/extractor"
+	"icis/internal/pack"
+	"icis/internal/registry"
 	"icis/internal/shortcut"
 	"icis/internal/uninstaller"
 
@@ -27,6 +31,9 @@ type App struct {
 	autoInstall       bool
 	pendingLaunchPath string
 	pendingLaunchAuto bool
+	pendingProtocolURL string
+	wizardMode        bool
+	installing        bool
 	mu                sync.Mutex
 }
 
@@ -44,12 +51,19 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.database = database
 	a.uninst = uninstaller.New(database)
+	arp.Backfill(database)
 
-	filePath, autoInstall := parseArgs(os.Args[1:])
-	if filePath != "" {
+	filePath, autoInstall, protocolURL := parseArgs(os.Args[1:])
+	if protocolURL != "" {
+		a.mu.Lock()
+		a.pendingProtocolURL = protocolURL
+		a.wizardMode = true
+		a.mu.Unlock()
+	} else if filePath != "" {
 		a.mu.Lock()
 		a.pendingLaunchPath = filePath
 		a.pendingLaunchAuto = autoInstall
+		a.wizardMode = true
 		a.mu.Unlock()
 	}
 }
@@ -58,6 +72,56 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.database != nil {
 		a.database.Close()
 	}
+}
+
+func (a *App) shouldBlockClose() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.installing
+}
+
+func (a *App) focusWindow() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowUnminimise(a.ctx)
+	runtime.WindowShow(a.ctx)
+}
+
+func (a *App) EnterWizardMode() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.wizardMode = true
+}
+
+func (a *App) IsWizardMode() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.wizardMode
+}
+
+func (a *App) IsInstalling() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.installing
+}
+
+func (a *App) handleProtocolURL(iciURL string) {
+	a.mu.Lock()
+	a.pendingProtocolURL = iciURL
+	a.wizardMode = true
+	a.mu.Unlock()
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "protocol-ici", iciURL)
+	}
+}
+
+func (a *App) GetPendingProtocolURL() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	url := a.pendingProtocolURL
+	a.pendingProtocolURL = ""
+	return url
 }
 
 func (a *App) LoadICIFile(path string) (*iciparser.ICIFile, error) {
@@ -74,6 +138,7 @@ func (a *App) loadICIFile(path string, autoInstall bool) (*iciparser.ICIFile, er
 	a.pendingICI = ici
 	a.pendingPath = path
 	a.autoInstall = autoInstall
+	a.wizardMode = true
 	a.mu.Unlock()
 
 	runtime.EventsEmit(a.ctx, "ici-loaded", ici)
@@ -129,6 +194,20 @@ func (a *App) GetPendingFile() PendingFile {
 }
 
 func (a *App) InstallApp(iciContent string, installDir string) error {
+	a.mu.Lock()
+	if a.installing {
+		a.mu.Unlock()
+		return fmt.Errorf("an installation is already in progress")
+	}
+	a.installing = true
+	a.mu.Unlock()
+
+	defer func() {
+		a.mu.Lock()
+		a.installing = false
+		a.mu.Unlock()
+	}()
+
 	ici, err := iciparser.ParseString(iciContent)
 	if err != nil {
 		return fmt.Errorf("failed to parse .ici: %w", err)
@@ -286,11 +365,14 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 		Shortcuts:   shortcutLinks,
 		Startup:     ici.Startup,
 		ICISource:   iciSource,
+		Homepage:    ici.Homepage,
 	}
 
 	if err := a.database.SaveApp(app); err != nil {
 		return fmt.Errorf("failed to save to database: %w", err)
 	}
+
+	arp.Register(app)
 
 	runtime.EventsEmit(a.ctx, "install-complete", map[string]string{
 		"name":  ici.Name,
@@ -361,4 +443,129 @@ func (a *App) SelectDirectory() (string, error) {
 		return "", err
 	}
 	return dir, nil
+}
+
+func (a *App) GetRegistryApps() registry.RegistryResult {
+	cfg := registry.LoadConfig()
+	return registry.FetchIndex(cfg.RegistryURL)
+}
+
+func (a *App) LoadRegistryICI(iciURL string) (*iciparser.ICIFile, error) {
+	content, err := registry.FetchICI(iciURL)
+	if err != nil {
+		return nil, err
+	}
+	ici, err := iciparser.ParseString(content)
+	if err != nil {
+		return nil, err
+	}
+	a.mu.Lock()
+	a.pendingICI = ici
+	a.pendingPath = ""
+	a.autoInstall = false
+	a.mu.Unlock()
+	runtime.EventsEmit(a.ctx, "ici-loaded", ici)
+	return ici, nil
+}
+
+func (a *App) GetRegistryURL() string {
+	cfg := registry.LoadConfig()
+	return cfg.RegistryURL
+}
+
+func (a *App) SetRegistryURL(url string) error {
+	cfg := registry.LoadConfig()
+	cfg.RegistryURL = url
+	return registry.SaveConfig(cfg)
+}
+
+func (a *App) WindowMinimize() {
+	if a.ctx != nil {
+		runtime.WindowMinimise(a.ctx)
+	}
+}
+
+func (a *App) WindowMaximize() {
+	if a.ctx != nil {
+		runtime.WindowToggleMaximise(a.ctx)
+	}
+}
+
+func (a *App) WindowIsMaximized() bool {
+	if a.ctx == nil {
+		return false
+	}
+	return runtime.WindowIsMaximised(a.ctx)
+}
+
+func (a *App) WindowClose() {
+	if a.ctx != nil {
+		runtime.Quit(a.ctx)
+	}
+}
+
+func (a *App) LaunchApp(name string) error {
+	app, err := a.database.GetApp(name)
+	if err != nil {
+		return fmt.Errorf("app not found: %w", err)
+	}
+
+	if len(app.Shortcuts) > 0 {
+		exePath := filepath.Join(app.InstallPath, app.Shortcuts[0].Exe)
+		cmd := exec.Command("cmd", "/c", "start", "", exePath)
+		return cmd.Run()
+	}
+
+	if app.Shortcut != "" {
+		exePath := filepath.Join(app.InstallPath, app.Shortcut)
+		cmd := exec.Command("cmd", "/c", "start", "", exePath)
+		return cmd.Run()
+	}
+
+	exes, err := filepath.Glob(filepath.Join(app.InstallPath, "**", "*.exe"))
+	if err == nil && len(exes) > 0 {
+		cmd := exec.Command("cmd", "/c", "start", "", exes[0])
+		return cmd.Run()
+	}
+
+	return fmt.Errorf("no executable found for %s", name)
+}
+
+func (a *App) OpenHomepage(name string) error {
+	app, err := a.database.GetApp(name)
+	if err != nil {
+		return fmt.Errorf("app not found: %w", err)
+	}
+
+	if app.Homepage == "" {
+		return fmt.Errorf("no homepage set for %s", name)
+	}
+
+	cmd := exec.Command("cmd", "/c", "start", app.Homepage)
+	return cmd.Run()
+}
+
+func (a *App) PackInstaller(iciContent string, outputPath string) error {
+	installerPath, err := pack.FindInstaller()
+	if err != nil {
+		return err
+	}
+	installerBinary, err := os.ReadFile(installerPath)
+	if err != nil {
+		return fmt.Errorf("cannot read ICIS installer: %w", err)
+	}
+
+	tmpFile, err := os.CreateTemp("", "icis-pack-*.ici")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(iciContent); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write .ici: %w", err)
+	}
+	tmpFile.Close()
+
+	return pack.Pack(tmpFile.Name(), outputPath, stubBinary, installerBinary)
 }

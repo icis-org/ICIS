@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "composite": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "svelte.config.js", "*.config.*"]
+}
