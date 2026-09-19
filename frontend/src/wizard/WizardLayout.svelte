@@ -114,11 +114,14 @@
     display: flex;
     flex-direction: column;
     background: transparent;
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
 
   .wizard-body {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
     position: relative;
   }

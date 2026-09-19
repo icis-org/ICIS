@@ -82,9 +82,11 @@
   .wizard-page {
     display: none;
     height: 100%;
+    width: 100%;
     padding: 0;
     justify-content: center;
     align-items: flex-start;
+    overflow: hidden;
     box-sizing: border-box;
   }
 
@@ -94,7 +96,7 @@
 
   .glass-card {
     width: 100%;
-    max-width: 560px;
+    height: 100%;
     background: rgba(22, 24, 34, 0.85);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -151,7 +153,7 @@
   }
 
   .detail-label {
-    color: var(--text-muted);
+    color: #CBD5E1;
   }
 
   .detail-value {
