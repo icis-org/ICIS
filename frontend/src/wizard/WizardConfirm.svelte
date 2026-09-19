@@ -81,9 +81,11 @@
 <style>
   .wizard-page {
     display: none;
-    padding: var(--spacing-xl);
+    height: 100%;
+    padding: 0;
     justify-content: center;
     align-items: flex-start;
+    box-sizing: border-box;
   }
 
   .wizard-page.active {
@@ -92,15 +94,21 @@
 
   .glass-card {
     width: 100%;
-    max-width: 520px;
-    background: rgba(30, 32, 46, 0.6);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    max-width: 560px;
+    background: rgba(22, 24, 34, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--border);
     border-top: 1px solid var(--border-highlight);
     border-radius: var(--radius-md);
-    padding: var(--spacing-xl);
+    padding: var(--spacing-lg);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --wails-draggable: drag;
+    box-sizing: border-box;
+  }
+
+  .glass-card button {
+    --wails-draggable: no-drag;
   }
 
   h2 {

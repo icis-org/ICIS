@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { app, toasts } from '../lib/state.svelte';
   import { InstallApp } from '../../wailsjs/go/main/App.js';
-  import { Quit } from '../../wailsjs/runtime/runtime.js';
+  import { Quit, WindowSetMinSize, WindowSetSize } from '../../wailsjs/runtime/runtime.js';
   import { buildICIContent } from '../lib/utils';
   import WizardConfirm from './WizardConfirm.svelte';
   import WizardProgress from './WizardProgress.svelte';
@@ -12,6 +13,11 @@
   let warnings = $state<string[]>([]);
   let doneName = $state('');
   let donePath = $state('');
+
+  onMount(() => {
+    WindowSetMinSize(600, 520);
+    WindowSetSize(600, 520);
+  });
 
   async function doInstall(customDir: string) {
     if (!app.currentICI) return;
@@ -90,9 +96,6 @@
 </script>
 
 <div class="wizard-root">
-  <div class="wizard-header">
-    <h1>ICIS Installer</h1>
-  </div>
   <div class="wizard-body">
     {#if app.wizardStep === 'confirm'}
       <WizardConfirm oninstall={doInstall} oncancel={handleCancel} />
@@ -110,29 +113,13 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: var(--bg-base);
+    background: transparent;
     overflow: hidden;
-  }
-
-  .wizard-header {
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: rgba(22, 24, 34, 0.85);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-
-  .wizard-header h1 {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
   }
 
   .wizard-body {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
     position: relative;
   }
 </style>
