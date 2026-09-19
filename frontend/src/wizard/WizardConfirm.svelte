@@ -8,10 +8,9 @@
   }
 
   let { oninstall, oncancel }: Props = $props();
-  let customDirValue = $state('');
 
   function handleInstall() {
-    const dir = app.selectedDir === 'custom' ? customDirValue : '';
+    const dir = app.selectedDir === 'custom' ? app.customDir : '';
     if (app.selectedDir === 'custom' && !dir) return;
     oninstall(dir);
   }

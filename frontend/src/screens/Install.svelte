@@ -6,7 +6,6 @@
   import ProgressBar from '../components/ProgressBar.svelte';
   import { onMount } from 'svelte';
 
-  let customDirValue = $state('');
   let showProgress = $state(false);
   let progressPercent = $state(0);
   let progressText = $state('Preparing...');
@@ -65,7 +64,7 @@
 
     let installDir = '';
     if (app.selectedDir === 'custom') {
-      installDir = customDirValue;
+      installDir = app.customDir;
       if (!installDir) {
         toasts.add('Please select a custom directory', 'error');
         return;

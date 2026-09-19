@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app, toasts } from '../lib/state.svelte';
-  import { LoadICIContent } from '../../wailsjs/go/main/App.js';
+  import { LoadICIContent, PackInstaller, SelectDirectory } from '../../wailsjs/go/main/App.js';
   import { buildICIPreview } from '../lib/utils';
 
   let name = $state('');
@@ -11,6 +11,7 @@
   let installDir = $state('appdata');
   let shortcutsText = $state('');
   let startup = $state(false);
+  let packing = $state(false);
 
   let preview = $derived(
     buildICIPreview(name, version, desc, url, type, installDir, shortcutsText, startup)
@@ -44,6 +45,24 @@
     } catch (err) {
       toasts.add(String(err), 'error');
     }
+  }
+
+  async function generateInstaller() {
+    if (!preview) {
+      toasts.add('Fill in the form first', 'error');
+      return;
+    }
+    try {
+      const outputDir = await SelectDirectory();
+      if (!outputDir) return;
+      packing = true;
+      toasts.add('Generating standalone installer...', 'warning');
+      await PackInstaller(preview, outputDir + '\\' + (name || 'app') + '-installer.exe');
+      toasts.add('Standalone installer created!', 'success');
+    } catch (err) {
+      toasts.add(String(err), 'error');
+    }
+    packing = false;
   }
 </script>
 
@@ -121,6 +140,9 @@
 
     <div class="install-actions">
       <button class="btn btn-secondary" onclick={downloadICi}>Download .ici</button>
+      <button class="btn btn-secondary" onclick={generateInstaller} disabled={packing}>
+        {packing ? 'Generating...' : 'Generate Installer'}
+      </button>
       <button class="btn btn-primary" onclick={installFromCreate}>Install</button>
     </div>
   </div>

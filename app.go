@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"icis/internal/iciparser"
 	"icis/internal/downloader"
 	"icis/internal/extractor"
+	"icis/internal/pack"
 	"icis/internal/registry"
 	"icis/internal/shortcut"
 	"icis/internal/uninstaller"
@@ -363,6 +365,7 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 		Shortcuts:   shortcutLinks,
 		Startup:     ici.Startup,
 		ICISource:   iciSource,
+		Homepage:    ici.Homepage,
 	}
 
 	if err := a.database.SaveApp(app); err != nil {
@@ -499,4 +502,70 @@ func (a *App) WindowClose() {
 	if a.ctx != nil {
 		runtime.Quit(a.ctx)
 	}
+}
+
+func (a *App) LaunchApp(name string) error {
+	app, err := a.database.GetApp(name)
+	if err != nil {
+		return fmt.Errorf("app not found: %w", err)
+	}
+
+	if len(app.Shortcuts) > 0 {
+		exePath := filepath.Join(app.InstallPath, app.Shortcuts[0].Exe)
+		cmd := exec.Command("cmd", "/c", "start", "", exePath)
+		return cmd.Run()
+	}
+
+	if app.Shortcut != "" {
+		exePath := filepath.Join(app.InstallPath, app.Shortcut)
+		cmd := exec.Command("cmd", "/c", "start", "", exePath)
+		return cmd.Run()
+	}
+
+	exes, err := filepath.Glob(filepath.Join(app.InstallPath, "**", "*.exe"))
+	if err == nil && len(exes) > 0 {
+		cmd := exec.Command("cmd", "/c", "start", "", exes[0])
+		return cmd.Run()
+	}
+
+	return fmt.Errorf("no executable found for %s", name)
+}
+
+func (a *App) OpenHomepage(name string) error {
+	app, err := a.database.GetApp(name)
+	if err != nil {
+		return fmt.Errorf("app not found: %w", err)
+	}
+
+	if app.Homepage == "" {
+		return fmt.Errorf("no homepage set for %s", name)
+	}
+
+	cmd := exec.Command("cmd", "/c", "start", app.Homepage)
+	return cmd.Run()
+}
+
+func (a *App) PackInstaller(iciContent string, outputPath string) error {
+	installerPath, err := pack.FindInstaller()
+	if err != nil {
+		return err
+	}
+	installerBinary, err := os.ReadFile(installerPath)
+	if err != nil {
+		return fmt.Errorf("cannot read ICIS installer: %w", err)
+	}
+
+	tmpFile, err := os.CreateTemp("", "icis-pack-*.ici")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(iciContent); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write .ici: %w", err)
+	}
+	tmpFile.Close()
+
+	return pack.Pack(tmpFile.Name(), outputPath, stubBinary, installerBinary)
 }

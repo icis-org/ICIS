@@ -5,10 +5,12 @@ import (
 	"embed"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"icis/internal/arp"
 	"icis/internal/db"
+	"icis/internal/pack"
 	"icis/internal/uninstaller"
 
 	"github.com/wailsapp/wails/v2"
@@ -20,7 +22,13 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed internal/pack/stub.exe
+var stubBinary []byte
+
 func main() {
+	if headlessPack() {
+		return
+	}
 	if headlessUninstall() {
 		return
 	}
@@ -84,6 +92,43 @@ func headlessUninstall() bool {
 			inst.Uninstall(appName)
 			database.Close()
 			arp.SweepOrphans()
+			return true
+		}
+	}
+	return false
+}
+
+func headlessPack() bool {
+	for i, arg := range os.Args[1:] {
+		if arg == "pack" {
+			args := os.Args[i+2:]
+			if len(args) < 1 {
+				println("Usage: icis pack <input.ici> [-o output.exe]")
+				os.Exit(1)
+			}
+			iciPath := args[0]
+			outputPath := strings.TrimSuffix(iciPath, filepath.Ext(iciPath)) + "-installer.exe"
+			for j, a := range args {
+				if a == "-o" && j+1 < len(args) {
+					outputPath = args[j+1]
+				}
+			}
+
+			installerPath, err := pack.FindInstaller()
+			if err != nil {
+				println("Error:", err.Error())
+				os.Exit(1)
+			}
+			installerBinary, err := os.ReadFile(installerPath)
+			if err != nil {
+				println("Error: cannot read ICIS installer:", err.Error())
+				os.Exit(1)
+			}
+
+			if err := pack.Pack(iciPath, outputPath, stubBinary, installerBinary); err != nil {
+				println("Error:", err.Error())
+				os.Exit(1)
+			}
 			return true
 		}
 	}

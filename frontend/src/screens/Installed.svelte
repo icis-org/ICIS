@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { toasts, installedApps } from '../lib/state.svelte';
-  import { ListInstalledApps, UninstallApp } from '../../wailsjs/go/main/App.js';
+  import { ListInstalledApps, UninstallApp, LaunchApp, OpenHomepage } from '../../wailsjs/go/main/App.js';
 
   onMount(() => {
     refreshInstalled();
@@ -24,6 +24,22 @@
       await UninstallApp(name);
       toasts.add(`${name} uninstalled`, 'success');
       refreshInstalled();
+    } catch (err) {
+      toasts.add(String(err), 'error');
+    }
+  }
+
+  async function launch(name: string) {
+    try {
+      await LaunchApp(name);
+    } catch (err) {
+      toasts.add(String(err), 'error');
+    }
+  }
+
+  async function homepage(name: string) {
+    try {
+      await OpenHomepage(name);
     } catch (err) {
       toasts.add(String(err), 'error');
     }
@@ -65,6 +81,22 @@
             <span class="meta">{appItem.version ? `v${appItem.version}` : ''}{appItem.installPath ? ` \u00b7 ${appItem.installPath}` : ''}</span>
           </div>
           <div class="app-actions">
+            <button class="btn btn-secondary btn-sm" onclick={() => launch(appItem.name)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              Launch
+            </button>
+            {#if appItem.homepage}
+              <button class="btn btn-secondary btn-sm" onclick={() => homepage(appItem.name)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                Homepage
+              </button>
+            {/if}
             <button class="btn btn-danger btn-sm" onclick={() => uninstall(appItem.name)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <polyline points="3 6 5 6 21 6"/>

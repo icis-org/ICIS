@@ -9,6 +9,7 @@ export const app = $state({
   currentICI: null as iciparser.ICIFile | null,
   pendingSource: '',
   selectedDir: 'appdata',
+  customDir: '',
   wizardStep: 'confirm' as WizardStep,
   installing: false,
 
@@ -41,6 +42,7 @@ export const app = $state({
     this.currentICI = null;
     this.pendingSource = '';
     this.selectedDir = 'appdata';
+    this.customDir = '';
     this.wizardStep = 'confirm';
     this.installing = false;
   },

@@ -8,13 +8,11 @@
 
   let { customDirInputId = 'custom-dir-input' }: Props = $props();
 
-  let customDirValue = $state('');
-
   async function browse() {
     try {
       const dir = await SelectDirectory();
       if (dir) {
-        customDirValue = dir;
+        app.customDir = dir;
       }
     } catch {}
   }
@@ -45,7 +43,8 @@
         class="custom-dir-input"
         id={customDirInputId}
         placeholder="Select custom directory..."
-        bind:value={customDirValue}
+        value={app.customDir}
+        oninput={(e) => app.customDir = (e.target as HTMLInputElement).value}
       />
       <button class="btn btn-secondary btn-sm" onclick={browse}>Browse</button>
     </div>
