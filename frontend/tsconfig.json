@@ -6,7 +6,7 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "composite": true,
-    "declaration": false,
+    "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
     "moduleResolution": "bundler",
@@ -23,7 +23,7 @@
     "types": ["vite/client"],
     "lib": ["DOM", "DOM.Iterable", "ES2024"]
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte", "frontend/wailsjs/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte", "wailsjs/**/*.ts"],
   "references": [
     { "path": "./tsconfig.node.json" }
   ]

@@ -28,15 +28,16 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:     "ICIS - Isam's Configurable Install System",
-		Width:     800,
-		Height:    600,
-		MinWidth:  700,
-		MinHeight: 500,
+		Title:      "ICIS - Isam's Configurable Install System",
+		Width:      800,
+		Height:     600,
+		MinWidth:   700,
+		MinHeight:  500,
+		Frameless:  true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 18, G: 18, B: 24, A: 1},
+		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		OnStartup:        app.startup,
 		OnBeforeClose: func(ctx context.Context) bool {
 			return app.shouldBlockClose()
@@ -45,8 +46,10 @@ func main() {
 			app,
 		},
 		Windows: &windows.Options{
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
+			WebviewIsTransparent: true,
+			WindowIsTranslucent:  true,
+			BackdropType:         windows.Acrylic,
+			Theme:                windows.Dark,
 		},
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: "e3984e08-28dc-4e3d-b70a-45e961589cdc",

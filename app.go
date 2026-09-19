@@ -476,3 +476,28 @@ func (a *App) SetRegistryURL(url string) error {
 	cfg.RegistryURL = url
 	return registry.SaveConfig(cfg)
 }
+
+func (a *App) WindowMinimize() {
+	if a.ctx != nil {
+		runtime.WindowMinimise(a.ctx)
+	}
+}
+
+func (a *App) WindowMaximize() {
+	if a.ctx != nil {
+		runtime.WindowToggleMaximise(a.ctx)
+	}
+}
+
+func (a *App) WindowIsMaximized() bool {
+	if a.ctx == nil {
+		return false
+	}
+	return runtime.WindowIsMaximised(a.ctx)
+}
+
+func (a *App) WindowClose() {
+	if a.ctx != nil {
+		runtime.Quit(a.ctx)
+	}
+}

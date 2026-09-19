@@ -2,9 +2,10 @@
   "compilerOptions": {
     "allowJs": false,
     "checkJs": false,
+    "composite": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "noEmit": true,
+    "noEmit": false,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "types": ["node"]
