@@ -11,9 +11,9 @@ import (
 
 	"icis/internal/arp"
 	"icis/internal/db"
-	"icis/internal/iciparser"
 	"icis/internal/downloader"
 	"icis/internal/extractor"
+	"icis/internal/iciparser"
 	"icis/internal/pack"
 	"icis/internal/registry"
 	"icis/internal/shortcut"
@@ -23,18 +23,18 @@ import (
 )
 
 type App struct {
-	ctx               context.Context
-	database          *db.DB
-	uninst            *uninstaller.Uninstaller
-	pendingICI        *iciparser.ICIFile
-	pendingPath       string
-	autoInstall       bool
-	pendingLaunchPath string
-	pendingLaunchAuto bool
+	ctx                context.Context
+	database           *db.DB
+	uninst             *uninstaller.Uninstaller
+	pendingICI         *iciparser.ICIFile
+	pendingPath        string
+	autoInstall        bool
+	pendingLaunchPath  string
+	pendingLaunchAuto  bool
 	pendingProtocolURL string
-	wizardMode        bool
-	installing        bool
-	mu                sync.Mutex
+	wizardMode         bool
+	installing         bool
+	mu                 sync.Mutex
 }
 
 func NewApp() *App {
@@ -250,7 +250,7 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 		"message": "Extracting files...",
 	})
 
-	extractedFiles, err := extractor.Extract(downloadedFile, destPath, func(file string, current, total int) {
+	extractedFiles, err := extractor.ExtractAs(downloadedFile, ici.Type, destPath, func(file string, current, total int) {
 		runtime.EventsEmit(a.ctx, "extract-progress", map[string]interface{}{
 			"file":    file,
 			"current": current,
@@ -375,8 +375,8 @@ func (a *App) InstallApp(iciContent string, installDir string) error {
 	arp.Register(app)
 
 	runtime.EventsEmit(a.ctx, "install-complete", map[string]string{
-		"name":  ici.Name,
-		"path":  destPath,
+		"name":    ici.Name,
+		"path":    destPath,
 		"message": fmt.Sprintf("%s installed successfully!", ici.Name),
 	})
 

@@ -66,10 +66,11 @@ html {
     font-family: var(--font-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background: transparent;
 }
 
 body {
-    background: var(--bg-base);
+    background: transparent;
     margin: 0;
     overflow: hidden;
     height: 100vh;
@@ -80,6 +81,7 @@ body {
 #app {
     height: 100vh;
     overflow: hidden;
+    background: transparent;
 }
 
 /* Scrollbar */

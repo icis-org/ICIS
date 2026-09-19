@@ -66,12 +66,12 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:      "ICIS - Isam's Configurable Install System",
-		Width:      960,
-		Height:     640,
-		MinWidth:   800,
-		MinHeight:  540,
-		Frameless:  true,
+		Title:     "ICIS - Isam's Configurable Install System",
+		Width:     960,
+		Height:    640,
+		MinWidth:  800,
+		MinHeight: 540,
+		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -86,7 +86,7 @@ func main() {
 		Windows: &windows.Options{
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  true,
-			BackdropType:         windows.Acrylic,
+			BackdropType:         windows.None,
 			Theme:                windows.Dark,
 		},
 		SingleInstanceLock: &options.SingleInstanceLock{
